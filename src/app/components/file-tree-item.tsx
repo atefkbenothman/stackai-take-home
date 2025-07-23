@@ -4,10 +4,8 @@ import { Plus, Minus, Folder, FolderOpen, File } from "lucide-react"
 import { toast } from "sonner"
 import { useEffect, useRef, useState } from "react"
 import { useQueryClient } from "@tanstack/react-query"
-import { useDebouncedCallback } from "use-debounce"
 import type { FileItem } from "@/lib/types"
 import { FileSkeleton } from "@/app/components/file-skeleton"
-import { useFile } from "@/hooks/use-file"
 import { getFiles } from "@/lib/api/files"
 
 interface FileTreeItemProps {
@@ -21,51 +19,95 @@ export function FileTreeItem({ item, level = 0 }: FileTreeItemProps) {
   const prefetchedFolders = useRef(new Set<string>())
 
   const [isExpanded, setIsExpanded] = useState(false)
-
-  const folderQuery = useFile(
-    isExpanded && isFolder ? item.resource_id : undefined,
-  )
+  const [folderData, setFolderData] = useState<any>(null)
+  const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState<any>(null)
 
   // Prefetch folder contents
   const prefetchFolder = async (folderId: string) => {
     // Skip if already prefetched or expanded
-    if (prefetchedFolders.current.has(folderId) || isExpanded) return
+    if (prefetchedFolders.current.has(folderId)) {
+      return
+    }
+
+    if (isExpanded) {
+      return
+    }
+
     try {
       await queryClient.prefetchQuery({
         queryKey: ["files", folderId],
         queryFn: () => getFiles(folderId),
         staleTime: 5 * 60 * 1000,
       })
+
       prefetchedFolders.current.add(folderId)
     } catch (error) {
       console.debug("Prefetch failed for folder:", folderId, error)
     }
   }
 
-  const debouncedPrefetch = useDebouncedCallback(prefetchFolder, 100)
+
+  // Fetch folder data with cache-first approach
+  const fetchFolderData = async (folderId: string) => {
+    // Check cache first
+    const cachedData = queryClient.getQueryData(["files", folderId])
+    if (cachedData) {
+      setFolderData(cachedData)
+      setIsLoading(false)
+      setError(null)
+      return
+    }
+
+    // Fetch from server if not in cache
+    setIsLoading(true)
+    setError(null)
+
+    try {
+      const data = await queryClient.fetchQuery({
+        queryKey: ["files", folderId],
+        queryFn: () => getFiles(folderId),
+        staleTime: 5 * 60 * 1000, // 5 minutes
+      })
+      setFolderData(data)
+    } catch (err) {
+      setError(err)
+    } finally {
+      setIsLoading(false)
+    }
+  }
 
   const handleToggle = () => {
     if (!isFolder) return
+    const wasExpanded = isExpanded
     setIsExpanded(!isExpanded)
+
+    if (!wasExpanded) {
+      fetchFolderData(item.resource_id)
+    } else {
+      // Clear data when collapsing to save memory
+      setFolderData(null)
+      setError(null)
+    }
   }
 
   const handleMouseEnter = () => {
     if (isFolder && !isExpanded) {
-      debouncedPrefetch(item.resource_id)
+      prefetchFolder(item.resource_id)
     }
   }
 
   // Show toast notification for errors
   useEffect(() => {
-    if (folderQuery?.error) {
+    if (error) {
       toast.error(`Failed to load folder: ${item.inode_path.path}`, {
         action: {
           label: "Retry",
-          onClick: () => handleToggle(),
+          onClick: () => fetchFolderData(item.resource_id),
         },
       })
     }
-  }, [folderQuery?.error, item.inode_path.path])
+  }, [error, item.inode_path.path, item.resource_id])
 
   return (
     <div>
@@ -104,20 +146,18 @@ export function FileTreeItem({ item, level = 0 }: FileTreeItemProps) {
 
       {isFolder && isExpanded && (
         <div className="animate-in slide-in-from-left-1 duration-150">
-          {folderQuery?.isLoading && <FileSkeleton level={level + 1} />}
-          {!folderQuery?.isLoading &&
-            !folderQuery?.error &&
-            folderQuery?.data?.files && (
-              <div>
-                {folderQuery.data.files.map((childFile: FileItem) => (
-                  <FileTreeItem
-                    key={childFile.resource_id}
-                    item={childFile}
-                    level={level + 1}
-                  />
-                ))}
-              </div>
-            )}
+          {isLoading && <FileSkeleton level={level + 1} />}
+          {!isLoading && !error && folderData?.files && (
+            <div>
+              {folderData.files.map((childFile: FileItem) => (
+                <FileTreeItem
+                  key={childFile.resource_id}
+                  item={childFile}
+                  level={level + 1}
+                />
+              ))}
+            </div>
+          )}
         </div>
       )}
     </div>
