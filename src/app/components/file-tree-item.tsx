@@ -4,7 +4,7 @@ import { Plus, Minus, Folder, FolderOpen, File } from "lucide-react"
 import { toast } from "sonner"
 import { useEffect, useRef, useState } from "react"
 import { useQueryClient } from "@tanstack/react-query"
-import type { FileItem } from "@/lib/types"
+import type { FileItem, FilesResponse } from "@/lib/types"
 import { FileSkeleton } from "@/app/components/file-skeleton"
 import { getFiles } from "@/lib/api/files"
 
@@ -19,9 +19,9 @@ export function FileTreeItem({ item, level = 0 }: FileTreeItemProps) {
   const prefetchedFolders = useRef(new Set<string>())
 
   const [isExpanded, setIsExpanded] = useState(false)
-  const [folderData, setFolderData] = useState<any>(null)
+  const [folderData, setFolderData] = useState<FilesResponse | null>(null)
   const [isLoading, setIsLoading] = useState(false)
-  const [error, setError] = useState<any>(null)
+  const [error, setError] = useState<Error | null>(null)
 
   // Prefetch folder contents
   const prefetchFolder = async (folderId: string) => {
@@ -51,7 +51,7 @@ export function FileTreeItem({ item, level = 0 }: FileTreeItemProps) {
   // Fetch folder data with cache-first approach
   const fetchFolderData = async (folderId: string) => {
     // Check cache first
-    const cachedData = queryClient.getQueryData(["files", folderId])
+    const cachedData = queryClient.getQueryData<FilesResponse>(["files", folderId])
     if (cachedData) {
       setFolderData(cachedData)
       setIsLoading(false)
@@ -71,7 +71,7 @@ export function FileTreeItem({ item, level = 0 }: FileTreeItemProps) {
       })
       setFolderData(data)
     } catch (err) {
-      setError(err)
+      setError(err instanceof Error ? err : new Error('Unknown error occurred'))
     } finally {
       setIsLoading(false)
     }
