@@ -1,11 +1,12 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useQueries } from "@tanstack/react-query"
+import { useQueries, UseQueryResult } from "@tanstack/react-query"
 import { toast } from "sonner"
 import { useFile } from "@/hooks/use-file"
 import { FileTree } from "@/app/components/file-tree"
-import type { FilesResponse, FolderQueryResult } from "@/lib/types"
+import { getFiles } from "@/lib/api/files"
+import type { FilesResponse } from "@/lib/types"
 
 export default function Files() {
   const { data: rootData, error } = useFile()
@@ -27,26 +28,15 @@ export default function Files() {
   const folderQueries = useQueries({
     queries: expandedFolderIds.map((folderId) => ({
       queryKey: ["files", folderId],
-      queryFn: async (): Promise<FilesResponse> => {
-        const url = `/api/files?folderId=${folderId}`
-        const response = await fetch(url)
-        if (!response.ok) {
-          throw new Error("Failed to fetch files")
-        }
-        return response.json()
-      },
+      queryFn: () => getFiles(folderId),
     })),
   })
 
   // Create a map of folder data for easy lookup
-  const folderDataMap = new Map<string, FolderQueryResult>()
+  const folderDataMap = new Map<string, UseQueryResult<FilesResponse>>()
   folderQueries.forEach((query, index) => {
     const folderId = expandedFolderIds[index]
-    folderDataMap.set(folderId, {
-      data: query.data,
-      isLoading: query.isLoading,
-      error: query.error,
-    })
+    folderDataMap.set(folderId, query)
   })
 
   // Rollback expansion on persistent errors (after retry attempts)

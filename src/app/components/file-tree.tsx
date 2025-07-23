@@ -1,12 +1,13 @@
 "use client"
 
+import { UseQueryResult } from "@tanstack/react-query"
 import { FileTreeItem } from "@/app/components/file-tree-item"
-import type { FileItem, FolderQueryResult } from "@/lib/types"
+import type { FileItem, FilesResponse } from "@/lib/types"
 
 interface FileTreeProps {
   files: FileItem[]
   expandedFolders: Set<string>
-  folderDataMap: Map<string, FolderQueryResult>
+  folderDataMap: Map<string, UseQueryResult<FilesResponse>>
   onFolderToggle: (folderId: string) => void
 }
 

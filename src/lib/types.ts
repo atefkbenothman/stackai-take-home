@@ -18,9 +18,3 @@ export interface FilesResponse {
   connection_id: string
   org_id: string
 }
-
-export interface FolderQueryResult {
-  data: FilesResponse | undefined
-  isLoading: boolean
-  error: Error | null
-}
