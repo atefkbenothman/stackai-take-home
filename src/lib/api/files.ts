@@ -6,9 +6,12 @@ import type { FilesResponse } from "@/lib/types"
  */
 export async function getFiles(folderId?: string): Promise<FilesResponse> {
   try {
-    const baseUrl = process.env.VERCEL_URL
-      ? `https://${process.env.VERCEL_URL}`
-      : "http://localhost:3000"
+    const baseUrl =
+      typeof window !== "undefined"
+        ? window.location.origin
+        : process.env.VERCEL_URL
+          ? `https://${process.env.VERCEL_URL}`
+          : "http://localhost:3000"
 
     const url = `${baseUrl}/api/files${folderId ? `?folderId=${folderId}` : ""}`
     const response = await fetch(url)
