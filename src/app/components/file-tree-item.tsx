@@ -1,7 +1,10 @@
 "use client"
 
 import { Plus, Minus, Folder, FolderOpen, File } from "lucide-react"
+import { toast } from "sonner"
+import { useEffect } from "react"
 import type { FileItem, FolderQueryResult } from "@/lib/types"
+import { FileSkeleton } from "./file-skeleton"
 
 interface FileTreeItemProps {
   item: FileItem
@@ -26,10 +29,22 @@ export function FileTreeItem({
     }
   }
 
+  // Show toast notification for errors
+  useEffect(() => {
+    if (folderData?.error) {
+      toast.error(`Failed to load folder: ${item.inode_path.path}`, {
+        action: {
+          label: "Retry",
+          onClick: () => onToggle?.(),
+        },
+      })
+    }
+  }, [folderData?.error, item.inode_path.path, onToggle])
+
   return (
     <div>
       <div
-        className="flex cursor-pointer items-center px-2 py-1 hover:bg-gray-50"
+        className="flex cursor-pointer items-center px-2 py-1 transition-colors hover:bg-gray-50"
         style={{ paddingLeft: `${level * 20 + 8}px` }}
         onClick={handleToggle}
       >
@@ -62,36 +77,22 @@ export function FileTreeItem({
 
       {/* Render folder contents when expanded */}
       {isFolder && isExpanded && (
-        <div>
-          {folderData?.isLoading && (
-            <div
-              className="py-1 text-sm text-gray-500"
-              style={{ paddingLeft: `${(level + 1) * 20 + 8}px` }}
-            >
-              Loading...
-            </div>
-          )}
+        <div className="animate-in slide-in-from-left-1 duration-150">
+          {folderData?.isLoading && <FileSkeleton level={level + 1} />}
 
-          {folderData?.error && (
-            <div
-              className="py-1 text-sm text-red-500"
-              style={{ paddingLeft: `${(level + 1) * 20 + 8}px` }}
-            >
-              Error loading folder
-            </div>
-          )}
-
-          {folderData?.data?.files && (
-            <div>
-              {folderData.data.files.map((childFile: FileItem) => (
-                <FileTreeItem
-                  key={childFile.resource_id}
-                  item={childFile}
-                  level={level + 1}
-                />
-              ))}
-            </div>
-          )}
+          {!folderData?.isLoading &&
+            !folderData?.error &&
+            folderData?.data?.files && (
+              <div>
+                {folderData.data.files.map((childFile: FileItem) => (
+                  <FileTreeItem
+                    key={childFile.resource_id}
+                    item={childFile}
+                    level={level + 1}
+                  />
+                ))}
+              </div>
+            )}
         </div>
       )}
     </div>

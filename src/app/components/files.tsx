@@ -1,7 +1,8 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useQueries } from "@tanstack/react-query"
+import { toast } from "sonner"
 import { useFile } from "@/hooks/use-file"
 import { FileTree } from "@/app/components/file-tree"
 import type { FilesResponse, FolderQueryResult } from "@/lib/types"
@@ -23,7 +24,6 @@ export default function Files() {
   }
 
   const expandedFolderIds = Array.from(expandedFolders)
-
   const folderQueries = useQueries({
     queries: expandedFolderIds.map((folderId) => ({
       queryKey: ["files", folderId],
@@ -48,6 +48,25 @@ export default function Files() {
       error: query.error,
     })
   })
+
+  // Rollback expansion on persistent errors (after retry attempts)
+  useEffect(() => {
+    folderQueries.forEach((query, index) => {
+      const folderId = expandedFolderIds[index]
+      if (query.error && query.failureCount > 1) {
+        // Rollback expansion after failed retries
+        setExpandedFolders((prev) => {
+          const newSet = new Set(prev)
+          newSet.delete(folderId)
+          return newSet
+        })
+
+        toast.error("Folder expansion failed", {
+          description: "The folder has been collapsed due to loading errors.",
+        })
+      }
+    })
+  }, [folderQueries, expandedFolderIds])
 
   if (error) return <div>Error: {error.message}</div>
 
