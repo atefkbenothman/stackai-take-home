@@ -49,22 +49,29 @@ export async function getAuthToken() {
 
   const data = await response.json()
 
-  // Cache in cookies
-  const expiresAt = Date.now() + data.expires_in * 1000
+  // Cache in cookies (only in Route Handler context)
+  // Skip cookie setting in RSC context to avoid "Cookies can only be modified" error
+  try {
+    const expiresAt = Date.now() + data.expires_in * 1000
 
-  cookieStore.set("stack_ai_token", data.access_token, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    maxAge: data.expires_in,
-  })
+    cookieStore.set("stack_ai_token", data.access_token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      maxAge: data.expires_in,
+    })
 
-  cookieStore.set("stack_ai_expires", expiresAt.toString(), {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    maxAge: data.expires_in,
-  })
+    cookieStore.set("stack_ai_expires", expiresAt.toString(), {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      maxAge: data.expires_in,
+    })
+  } catch (error) {
+    // Silently skip cookie setting if called from RSC context
+    // The token will still be returned and work for the current request
+    console.log("Cookie setting skipped (likely called from RSC context)")
+  }
 
   return data.access_token
 }
