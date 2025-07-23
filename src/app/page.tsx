@@ -3,7 +3,7 @@ import {
   HydrationBoundary,
   QueryClient,
 } from "@tanstack/react-query"
-import { FileTree } from "@/app/components/file-tree"
+import { FileTree } from "@/components/file-tree/file-tree"
 import { getFilesServer } from "@/lib/api/files-server"
 import type { FilesResponse } from "@/lib/types"
 

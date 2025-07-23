@@ -1,6 +1,6 @@
 "use client"
 
-import { FileTreeItem } from "@/app/components/file-tree-item"
+import { FileTreeItem } from "@/components/file-tree/file-tree-item"
 import type { FileItem } from "@/lib/types"
 
 interface FileTreeProps {
@@ -15,11 +15,7 @@ export function FileTree({ files }: FileTreeProps) {
       </div>
       <div className="max-h-96 overflow-y-auto">
         {files.map((file) => (
-          <FileTreeItem
-            key={file.resource_id}
-            item={file}
-            level={0}
-          />
+          <FileTreeItem key={file.resource_id} item={file} level={0} />
         ))}
       </div>
     </div>

@@ -5,7 +5,7 @@ import { toast } from "sonner"
 import { useEffect, useRef, useState } from "react"
 import { useQueryClient } from "@tanstack/react-query"
 import type { FileItem, FilesResponse } from "@/lib/types"
-import { FileSkeleton } from "@/app/components/file-skeleton"
+import { FileSkeleton } from "@/components/file-tree/file-skeleton"
 import { getFiles } from "@/lib/api/files"
 
 interface FileTreeItemProps {
@@ -47,11 +47,13 @@ export function FileTreeItem({ item, level = 0 }: FileTreeItemProps) {
     }
   }
 
-
   // Fetch folder data with cache-first approach
   const fetchFolderData = async (folderId: string) => {
     // Check cache first
-    const cachedData = queryClient.getQueryData<FilesResponse>(["files", folderId])
+    const cachedData = queryClient.getQueryData<FilesResponse>([
+      "files",
+      folderId,
+    ])
     if (cachedData) {
       setFolderData(cachedData)
       setIsLoading(false)
@@ -71,7 +73,7 @@ export function FileTreeItem({ item, level = 0 }: FileTreeItemProps) {
       })
       setFolderData(data)
     } catch (err) {
-      setError(err instanceof Error ? err : new Error('Unknown error occurred'))
+      setError(err instanceof Error ? err : new Error("Unknown error occurred"))
     } finally {
       setIsLoading(false)
     }
