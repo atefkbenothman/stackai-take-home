@@ -4,6 +4,7 @@ import {
   QueryClient,
 } from "@tanstack/react-query"
 import { FileTree } from "@/components/file-tree/file-tree"
+import { FileTreeSkeleton } from "@/components/file-tree/file-tree-skeleton"
 import { getFilesServer } from "@/lib/api/files-server"
 import type { FilesResponse } from "@/lib/types"
 
@@ -29,7 +30,7 @@ export default async function Home() {
         {rootData ? (
           <FileTree files={rootData.files} />
         ) : (
-          <div>Error loading files</div>
+          <FileTreeSkeleton count={8} />
         )}
       </div>
     </HydrationBoundary>
