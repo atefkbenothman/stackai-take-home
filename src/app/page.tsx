@@ -4,7 +4,7 @@ import {
   QueryClient,
 } from "@tanstack/react-query"
 import { FileTree } from "@/app/components/file-tree"
-import { getFiles } from "@/lib/api/files"
+import { getFilesServer } from "@/lib/api/files-server"
 import type { FilesResponse } from "@/lib/types"
 
 export default async function Home() {
@@ -12,7 +12,7 @@ export default async function Home() {
   let rootData: FilesResponse | null = null
 
   try {
-    rootData = await getFiles()
+    rootData = await getFilesServer()
     await queryClient.prefetchQuery({
       queryKey: ["files"],
       queryFn: () => rootData,
