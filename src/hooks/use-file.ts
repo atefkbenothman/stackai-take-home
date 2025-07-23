@@ -23,7 +23,7 @@ interface FilesResponse {
 
 export function useFile(folderId?: string) {
   return useQuery({
-    queryKey: ["files", folderId],
+    queryKey: folderId ? ["files", folderId] : ["files"],
     queryFn: async () => {
       const url = folderId ? `/api/files?folderId=${folderId}` : "/api/files"
       const response = await fetch(url)
