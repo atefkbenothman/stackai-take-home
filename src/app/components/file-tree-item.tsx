@@ -1,6 +1,5 @@
 "use client"
 
-import { useState } from "react"
 import { Plus, Minus, Folder, FolderOpen, File } from "lucide-react"
 
 interface FileTreeItemProps {
@@ -12,23 +11,34 @@ interface FileTreeItemProps {
     }
   }
   level?: number
-  children?: React.ReactNode
+  isExpanded?: boolean
+  folderData?: {
+    data?: any
+    isLoading?: boolean
+    error?: any
+  }
+  onToggle?: () => void
 }
 
-export function FileTreeItem({ item, level = 0, children }: FileTreeItemProps) {
-  const [isExpanded, setIsExpanded] = useState(false)
+export function FileTreeItem({
+  item,
+  level = 0,
+  isExpanded = false,
+  folderData,
+  onToggle,
+}: FileTreeItemProps) {
   const isFolder = item.inode_type === "directory"
 
   const handleToggle = () => {
-    if (isFolder) {
-      setIsExpanded(!isExpanded)
+    if (isFolder && onToggle) {
+      onToggle()
     }
   }
 
   return (
     <div>
       <div
-        className="flex cursor-pointer items-center px-2 py-1 hover:bg-gray-100"
+        className="flex cursor-pointer items-center px-2 py-1 hover:bg-gray-50"
         style={{ paddingLeft: `${level * 20 + 8}px` }}
         onClick={handleToggle}
       >
@@ -59,7 +69,39 @@ export function FileTreeItem({ item, level = 0, children }: FileTreeItemProps) {
         </span>
       </div>
 
-      {isFolder && isExpanded && children && <div>{children}</div>}
+      {isFolder && isExpanded && (
+        <div>
+          {folderData?.isLoading && (
+            <div
+              className="py-1 text-sm text-gray-500"
+              style={{ paddingLeft: `${(level + 1) * 20 + 8}px` }}
+            >
+              Loading...
+            </div>
+          )}
+
+          {folderData?.error && (
+            <div
+              className="py-1 text-sm text-red-500"
+              style={{ paddingLeft: `${(level + 1) * 20 + 8}px` }}
+            >
+              Error loading folder
+            </div>
+          )}
+
+          {folderData?.data?.files && (
+            <div>
+              {folderData.data.files.map((childFile: any) => (
+                <FileTreeItem
+                  key={childFile.resource_id}
+                  item={childFile}
+                  level={level + 1}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   )
 }

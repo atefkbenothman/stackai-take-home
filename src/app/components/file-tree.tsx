@@ -10,9 +10,17 @@ interface FileTreeProps {
       path: string
     }
   }>
+  expandedFolders: Set<string>
+  folderDataMap: Map<string, any>
+  onFolderToggle: (folderId: string) => void
 }
 
-export function FileTree({ files }: FileTreeProps) {
+export function FileTree({
+  files,
+  expandedFolders,
+  folderDataMap,
+  onFolderToggle,
+}: FileTreeProps) {
   return (
     <div className="border bg-white">
       <div className="border-b bg-gray-200 p-2">
@@ -20,9 +28,14 @@ export function FileTree({ files }: FileTreeProps) {
       </div>
       <div className="max-h-96 overflow-y-auto">
         {files.map((file) => (
-          <FileTreeItem key={file.resource_id} item={file} level={0}>
-            {/* Placeholder for future nested files */}
-          </FileTreeItem>
+          <FileTreeItem
+            key={file.resource_id}
+            item={file}
+            level={0}
+            isExpanded={expandedFolders.has(file.resource_id)}
+            folderData={folderDataMap.get(file.resource_id)}
+            onToggle={() => onFolderToggle(file.resource_id)}
+          />
         ))}
       </div>
     </div>
