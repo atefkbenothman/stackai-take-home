@@ -3,9 +3,9 @@
 import { Plus, Minus, Folder, FolderOpen, File } from "lucide-react"
 import { toast } from "sonner"
 import { useEffect, useRef, useState } from "react"
-import { useQueryClient, UseQueryResult } from "@tanstack/react-query"
+import { useQueryClient } from "@tanstack/react-query"
 import { useDebouncedCallback } from "use-debounce"
-import type { FileItem, FilesResponse } from "@/lib/types"
+import type { FileItem } from "@/lib/types"
 import { FileSkeleton } from "@/app/components/file-skeleton"
 import { useFile } from "@/hooks/use-file"
 import { getFiles } from "@/lib/api/files"
@@ -13,78 +13,51 @@ import { getFiles } from "@/lib/api/files"
 interface FileTreeItemProps {
   item: FileItem
   level?: number
-  isExpanded?: boolean
-  folderData?: UseQueryResult<FilesResponse>
-  onToggle?: () => void
 }
 
-export function FileTreeItem({
-  item,
-  level = 0,
-  isExpanded = false,
-  folderData,
-  onToggle,
-}: FileTreeItemProps) {
+export function FileTreeItem({ item, level = 0 }: FileTreeItemProps) {
   const isFolder = item.inode_type === "directory"
-
   const queryClient = useQueryClient()
   const prefetchedFolders = useRef(new Set<string>())
 
-  // Local expansion state for nested folders (when no parent management)
-  const [localExpanded, setLocalExpanded] = useState(false)
+  const [isExpanded, setIsExpanded] = useState(false)
 
-  // Use parent-managed state if available, otherwise local state
-  const isCurrentlyExpanded = onToggle ? isExpanded : localExpanded
-
-  // Use useFile hook for nested folders (when no parent management)
-  const localFileQuery = useFile(
-    !onToggle && isCurrentlyExpanded && isFolder ? item.resource_id : undefined,
+  const folderQuery = useFile(
+    isExpanded && isFolder ? item.resource_id : undefined,
   )
-
-  // Use parent-provided data or local query data
-  const currentFolderData = onToggle ? folderData : localFileQuery
 
   // Prefetch folder contents
   const prefetchFolder = async (folderId: string) => {
     // Skip if already prefetched or expanded
-    if (prefetchedFolders.current.has(folderId) || isCurrentlyExpanded) return
-
+    if (prefetchedFolders.current.has(folderId) || isExpanded) return
     try {
       await queryClient.prefetchQuery({
         queryKey: ["files", folderId],
         queryFn: () => getFiles(folderId),
-        staleTime: 5 * 60 * 1000, // 5 minutes
+        staleTime: 5 * 60 * 1000,
       })
-
       prefetchedFolders.current.add(folderId)
     } catch (error) {
       console.debug("Prefetch failed for folder:", folderId, error)
     }
   }
 
-  // Debounced prefetch function (300ms delay)
-  const debouncedPrefetch = useDebouncedCallback(prefetchFolder, 300)
+  const debouncedPrefetch = useDebouncedCallback(prefetchFolder, 100)
 
   const handleToggle = () => {
     if (!isFolder) return
-    if (onToggle) {
-      // Parent-managed expansion
-      onToggle()
-    } else {
-      // Local expansion management for nested folders
-      setLocalExpanded(!localExpanded)
-    }
+    setIsExpanded(!isExpanded)
   }
 
   const handleMouseEnter = () => {
-    if (isFolder && !isCurrentlyExpanded) {
+    if (isFolder && !isExpanded) {
       debouncedPrefetch(item.resource_id)
     }
   }
 
   // Show toast notification for errors
   useEffect(() => {
-    if (currentFolderData?.error) {
+    if (folderQuery?.error) {
       toast.error(`Failed to load folder: ${item.inode_path.path}`, {
         action: {
           label: "Retry",
@@ -92,7 +65,7 @@ export function FileTreeItem({
         },
       })
     }
-  }, [currentFolderData?.error, item.inode_path.path])
+  }, [folderQuery?.error, item.inode_path.path])
 
   return (
     <div>
@@ -104,7 +77,7 @@ export function FileTreeItem({
       >
         <div className="mr-2 flex h-4 w-4 items-center justify-center text-gray-500">
           {isFolder ? (
-            isCurrentlyExpanded ? (
+            isExpanded ? (
               <Minus size={12} />
             ) : (
               <Plus size={12} />
@@ -114,7 +87,7 @@ export function FileTreeItem({
 
         <div className="mr-2 flex h-5 w-5 items-center justify-center text-gray-600">
           {isFolder ? (
-            isCurrentlyExpanded ? (
+            isExpanded ? (
               <FolderOpen size={16} />
             ) : (
               <Folder size={16} />
@@ -129,14 +102,14 @@ export function FileTreeItem({
         </span>
       </div>
 
-      {isFolder && isCurrentlyExpanded && (
+      {isFolder && isExpanded && (
         <div className="animate-in slide-in-from-left-1 duration-150">
-          {currentFolderData?.isLoading && <FileSkeleton level={level + 1} />}
-          {!currentFolderData?.isLoading &&
-            !currentFolderData?.error &&
-            currentFolderData?.data?.files && (
+          {folderQuery?.isLoading && <FileSkeleton level={level + 1} />}
+          {!folderQuery?.isLoading &&
+            !folderQuery?.error &&
+            folderQuery?.data?.files && (
               <div>
-                {currentFolderData.data.files.map((childFile: FileItem) => (
+                {folderQuery.data.files.map((childFile: FileItem) => (
                   <FileTreeItem
                     key={childFile.resource_id}
                     item={childFile}

@@ -1,22 +1,13 @@
 "use client"
 
-import { UseQueryResult } from "@tanstack/react-query"
 import { FileTreeItem } from "@/app/components/file-tree-item"
-import type { FileItem, FilesResponse } from "@/lib/types"
+import type { FileItem } from "@/lib/types"
 
 interface FileTreeProps {
   files: FileItem[]
-  expandedFolders: Set<string>
-  folderDataMap: Map<string, UseQueryResult<FilesResponse>>
-  onFolderToggle: (folderId: string) => void
 }
 
-export function FileTree({
-  files,
-  expandedFolders,
-  folderDataMap,
-  onFolderToggle,
-}: FileTreeProps) {
+export function FileTree({ files }: FileTreeProps) {
   return (
     <div className="border bg-white">
       <div className="border-b bg-gray-200 p-2">
@@ -28,9 +19,6 @@ export function FileTree({
             key={file.resource_id}
             item={file}
             level={0}
-            isExpanded={expandedFolders.has(file.resource_id)}
-            folderData={folderDataMap.get(file.resource_id)}
-            onToggle={() => onFolderToggle(file.resource_id)}
           />
         ))}
       </div>

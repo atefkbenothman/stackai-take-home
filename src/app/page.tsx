@@ -3,29 +3,35 @@ import {
   HydrationBoundary,
   QueryClient,
 } from "@tanstack/react-query"
-import Files from "@/app/components/files"
+import { FileTree } from "@/app/components/file-tree"
 import { getFiles } from "@/lib/api/files"
+import type { FilesResponse } from "@/lib/types"
 
 export default async function Home() {
   const queryClient = new QueryClient()
+  let rootData: FilesResponse | null = null
 
   try {
+    rootData = await getFiles()
     await queryClient.prefetchQuery({
       queryKey: ["files"],
-      queryFn: async () => {
-        const data = await getFiles()
-        return data
-      },
+      queryFn: () => rootData,
     })
   } catch (error) {
-    console.error("Prefetch FAILED:", error)
+    console.error("Failed to fetch root files:", error)
   }
 
   const dehydratedState = dehydrate(queryClient)
 
   return (
     <HydrationBoundary state={dehydratedState}>
-      <Files />
+      <div className="p-4">
+        {rootData ? (
+          <FileTree files={rootData.files} />
+        ) : (
+          <div>Error loading files</div>
+        )}
+      </div>
     </HydrationBoundary>
   )
 }
