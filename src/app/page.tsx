@@ -11,7 +11,9 @@ export default async function Home() {
   await queryClient.prefetchQuery({
     queryKey: ["files"],
     queryFn: async () => {
-      const baseUrl = process.env.NEXTAUTH_URL || "http://localhost:3000"
+      const baseUrl = process.env.VERCEL_URL
+        ? `https://${process.env.VERCEL_URL}`
+        : "http://localhost:3000"
       const response = await fetch(`${baseUrl}/api/files`, {
         cache: "no-store",
       })
