@@ -1,17 +1,12 @@
 "use client"
 
 import { FileTreeItem } from "@/app/components/file-tree-item"
+import type { FileItem, FolderQueryResult } from "@/lib/types"
 
 interface FileTreeProps {
-  files: Array<{
-    resource_id: string
-    inode_type: "directory" | "file"
-    inode_path: {
-      path: string
-    }
-  }>
+  files: FileItem[]
   expandedFolders: Set<string>
-  folderDataMap: Map<string, any>
+  folderDataMap: Map<string, FolderQueryResult>
   onFolderToggle: (folderId: string) => void
 }
 

@@ -1,25 +1,5 @@
 import { useQuery } from "@tanstack/react-query"
-
-interface FileItem {
-  resource_id: string
-  inode_type: "directory" | "file"
-  inode_path: {
-    path: string
-  }
-  created_at: string
-  modified_at: string
-  dataloader_metadata?: {
-    size?: number
-    content_mime?: string
-    web_url?: string
-  }
-}
-
-interface FilesResponse {
-  files: FileItem[]
-  connection_id: string
-  org_id: string
-}
+import type { FilesResponse } from "@/lib/types"
 
 export function useFile(folderId?: string) {
   return useQuery({

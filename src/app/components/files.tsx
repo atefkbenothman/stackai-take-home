@@ -4,6 +4,7 @@ import { useState } from "react"
 import { useQueries } from "@tanstack/react-query"
 import { useFile } from "@/hooks/use-file"
 import { FileTree } from "@/app/components/file-tree"
+import type { FilesResponse, FolderQueryResult } from "@/lib/types"
 
 export default function Files() {
   const { data: rootData, error } = useFile()
@@ -26,7 +27,7 @@ export default function Files() {
   const folderQueries = useQueries({
     queries: expandedFolderIds.map((folderId) => ({
       queryKey: ["files", folderId],
-      queryFn: async () => {
+      queryFn: async (): Promise<FilesResponse> => {
         const url = `/api/files?folderId=${folderId}`
         const response = await fetch(url)
         if (!response.ok) {
@@ -38,7 +39,7 @@ export default function Files() {
   })
 
   // Create a map of folder data for easy lookup
-  const folderDataMap = new Map<string, any>()
+  const folderDataMap = new Map<string, FolderQueryResult>()
   folderQueries.forEach((query, index) => {
     const folderId = expandedFolderIds[index]
     folderDataMap.set(folderId, {

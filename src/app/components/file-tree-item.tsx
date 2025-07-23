@@ -1,22 +1,13 @@
 "use client"
 
 import { Plus, Minus, Folder, FolderOpen, File } from "lucide-react"
+import type { FileItem, FolderQueryResult } from "@/lib/types"
 
 interface FileTreeItemProps {
-  item: {
-    resource_id: string
-    inode_type: "directory" | "file"
-    inode_path: {
-      path: string
-    }
-  }
+  item: FileItem
   level?: number
   isExpanded?: boolean
-  folderData?: {
-    data?: any
-    isLoading?: boolean
-    error?: any
-  }
+  folderData?: FolderQueryResult
   onToggle?: () => void
 }
 
@@ -69,6 +60,7 @@ export function FileTreeItem({
         </span>
       </div>
 
+      {/* Render folder contents when expanded */}
       {isFolder && isExpanded && (
         <div>
           {folderData?.isLoading && (
@@ -91,7 +83,7 @@ export function FileTreeItem({
 
           {folderData?.data?.files && (
             <div>
-              {folderData.data.files.map((childFile: any) => (
+              {folderData.data.files.map((childFile: FileItem) => (
                 <FileTreeItem
                   key={childFile.resource_id}
                   item={childFile}
