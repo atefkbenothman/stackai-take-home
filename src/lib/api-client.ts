@@ -8,14 +8,7 @@ import type {
  * Fetch files from Google Drive connection
  */
 export async function fetchFiles(folderId?: string): Promise<FilesResponse> {
-  const baseUrl =
-    typeof window !== "undefined"
-      ? window.location.origin
-      : process.env.VERCEL_URL
-        ? `https://${process.env.VERCEL_URL}`
-        : "http://localhost:3000"
-
-  const url = `${baseUrl}/api/files${folderId ? `?folderId=${folderId}` : ""}`
+  const url = `/api/files${folderId ? `?folderId=${folderId}` : ""}`
   const response = await fetch(url)
 
   if (!response.ok) {

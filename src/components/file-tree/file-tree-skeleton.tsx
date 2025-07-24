@@ -19,7 +19,7 @@ export function FileTreeSkeleton() {
         {Array.from({ length: 13 }).map((_, index) => (
           <div className="border-b" key={index}>
             <div className="-mx-10 flex items-center">
-              <FileTreeItemSkeleton level={0} />
+              <FileTreeItemSkeleton level={0} index={index} />
             </div>
           </div>
         ))}
