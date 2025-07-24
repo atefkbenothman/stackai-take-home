@@ -14,6 +14,7 @@ export interface FileItem {
   }
   created_at: string
   modified_at: string
+  parentId?: string // Parent folder's resource_id, undefined for root items
   dataloader_metadata?: {
     size?: number
     content_mime?: string

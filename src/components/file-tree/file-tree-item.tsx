@@ -51,16 +51,10 @@ export function FileTreeItem({ item, level = 0 }: FileTreeItemProps) {
           checked={itemIsIndeterminate ? "indeterminate" : itemIsSelected}
           onCheckedChange={() => {
             if (isFolder && folderData?.files) {
-              // Additional validation: ensure we're only passing children that belong to this specific folder
-              const folderPath = item.inode_path.path
-              const validChildren = folderData.files.filter((child) => {
-                const childPath = child.inode_path.path
-                // Ensure child belongs to this specific folder and is a direct child
-                return (
-                  childPath.startsWith(folderPath + "/") &&
-                  !childPath.substring(folderPath.length + 1).includes("/")
-                )
-              })
+              // Filter to only include direct children of this specific folder
+              const validChildren = folderData.files.filter((child) => 
+                child.parentId === item.resource_id
+              )
               toggleFolderSelection(item, validChildren)
             } else {
               toggleSelection(item)

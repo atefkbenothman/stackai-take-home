@@ -64,20 +64,11 @@ export function SelectionProvider({ children }: SelectionProviderProps) {
         const newFolderSelectionIntent = new Set(prev.folderSelectionIntent)
 
         const isCurrentlySelected = prev.selectedIds.has(folder.resource_id)
-        const folderPath = folder.inode_path.path
 
-        // Filter children to only include direct descendants of this specific folder
-        const validChildren = children.filter((child) => {
-          const childPath = child.inode_path.path
-          // Check if child path starts with the folder path followed by a slash
-          // and doesn't have additional nested folders (direct children only)
-          if (!childPath.startsWith(folderPath + "/")) {
-            return false
-          }
-          // Ensure it's a direct child (no additional slashes after the folder path)
-          const relativePath = childPath.substring(folderPath.length + 1)
-          return !relativePath.includes("/")
-        })
+        // Filter children to only include direct children of this specific folder
+        const validChildren = children.filter((child) => 
+          child.parentId === folder.resource_id
+        )
 
         if (isCurrentlySelected) {
           // Deselect folder and all valid children recursively
@@ -210,41 +201,45 @@ export function SelectionProvider({ children }: SelectionProviderProps) {
         return false // Fully selected, not indeterminate
       }
 
-      const folderPath = folder.inode_path.path
-
-      // Filter children to only include direct descendants of this specific folder
-      const validChildren = children.filter((child) => {
-        const childPath = child.inode_path.path
-        // Check if child path starts with the folder path followed by a slash
-        // and doesn't have additional nested folders (direct children only)
-        if (!childPath.startsWith(folderPath + "/")) {
-          return false
-        }
-        // Ensure it's a direct child (no additional slashes after the folder path)
-        const relativePath = childPath.substring(folderPath.length + 1)
-        return !relativePath.includes("/")
-      })
-
-      // Check if any selected item is a descendant of this folder
-      const selectedDescendants = Array.from(
-        selectionState.selectedItems.values(),
-      ).filter(
-        (item) =>
-          item.resource_id !== folder.resource_id &&
-          item.inode_path.path.startsWith(folderPath + "/"),
+      // Filter children to only include direct children of this specific folder
+      const validChildren = children.filter((child) => 
+        child.parentId === folder.resource_id
       )
 
-      if (selectedDescendants.length === 0) {
+      // Check if any selected item is a direct or indirect descendant of this folder
+      const hasSelectedDescendants = Array.from(
+        selectionState.selectedItems.values(),
+      ).some((item) => {
+        if (item.resource_id === folder.resource_id) return false
+        
+        // Check if item is a direct child
+        if (item.parentId === folder.resource_id) return true
+        
+        // Check if item is an indirect descendant by finding its parent chain
+        // This handles nested selections without path manipulation
+        let currentItem = item
+        while (currentItem.parentId) {
+          const parent = Array.from(selectionState.selectedItems.values())
+            .find(p => p.resource_id === currentItem.parentId)
+          if (!parent) break
+          
+          if (parent.resource_id === folder.resource_id) return true
+          currentItem = parent
+        }
+        return false
+      })
+
+      if (!hasSelectedDescendants) {
         return false // No descendants selected
       }
 
       // Has at least one descendant selected
-      // If we have children data, check if all immediate valid children are selected
+      // If we have children data, check if all direct children are selected
       if (validChildren.length > 0) {
-        const allValidChildrenSelected = validChildren.every((child) =>
+        const allDirectChildrenSelected = validChildren.every((child) =>
           selectionState.selectedIds.has(child.resource_id),
         )
-        return !allValidChildrenSelected // Indeterminate if not all valid children selected
+        return !allDirectChildrenSelected // Indeterminate if not all direct children selected
       }
 
       // No children data (collapsed), but has descendants selected
