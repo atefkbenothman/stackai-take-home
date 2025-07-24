@@ -1,10 +1,10 @@
 "use client"
 
+import { memo, useCallback } from "react"
 import { useSelection } from "@/hooks/use-selection"
 import { useFileIndexing } from "@/hooks/use-file-indexing"
 import { Button } from "@/components/ui/button"
 import type { FileItem } from "@/lib/types"
-import { useCallback } from "react"
 
 function getIndexButtonText(isIndexing: boolean, isPolling: boolean): string {
   if (isIndexing) return "Creating KB..."
@@ -16,7 +16,7 @@ interface FileTreeFooterProps {
   allFiles?: FileItem[]
 }
 
-export function FileTreeFooter({ allFiles = [] }: FileTreeFooterProps) {
+function FileTreeFooterComponent({ allFiles = [] }: FileTreeFooterProps) {
   const {
     getSelectionSummary,
     clearSelection,
@@ -82,3 +82,5 @@ export function FileTreeFooter({ allFiles = [] }: FileTreeFooterProps) {
     </div>
   )
 }
+
+export const FileTreeFooter = memo(FileTreeFooterComponent)

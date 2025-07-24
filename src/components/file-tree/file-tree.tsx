@@ -7,7 +7,7 @@ import { FileTreeFooter } from "@/components/file-tree/file-tree-footer"
 import { FileTreeHeader } from "@/components/file-tree/file-tree-header"
 import { FileTreeSkeleton } from "@/components/file-tree/file-tree-skeleton"
 import { FileTreeError } from "@/components/file-tree/file-tree-error"
-import { getFiles } from "@/lib/api/files"
+import { fetchFiles } from "@/lib/api-client"
 import {
   sortFiles,
   searchCachedFiles,
@@ -48,7 +48,7 @@ export function FileTree() {
     error,
   } = useQuery({
     queryKey: ["files"],
-    queryFn: () => getFiles(),
+    queryFn: () => fetchFiles(),
     staleTime: 5 * 60 * 1000,
   })
 
@@ -66,6 +66,10 @@ export function FileTree() {
       return sortFiles(filteredFiles, sortBy)
     }
   }, [filesData?.files, sortBy, debouncedSearch, filterExtension, queryClient])
+
+  const stableAllFiles = useMemo(() => {
+    return filesData?.files || []
+  }, [filesData?.files])
 
   if (isLoading) {
     return <FileTreeSkeleton />
@@ -106,7 +110,7 @@ export function FileTree() {
           ))
         )}
       </div>
-      <FileTreeFooter allFiles={filesData?.files || []} />
+      <FileTreeFooter allFiles={stableAllFiles} />
     </div>
   )
 }
