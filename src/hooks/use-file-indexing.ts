@@ -13,7 +13,7 @@ import {
   triggerKnowledgeBaseSync,
   getKnowledgeBaseStatus,
   fetchFiles,
-} from "@/lib/api-client"
+} from "@/lib/stack-ai-client"
 import type { FileItem, KBResource } from "@/lib/types"
 
 interface UseFileIndexingReturn {

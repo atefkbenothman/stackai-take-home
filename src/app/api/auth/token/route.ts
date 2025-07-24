@@ -7,7 +7,8 @@ import { getOrgInfo, getGoogleDriveConnection } from "@/lib/stack-ai"
  */
 export async function GET(): Promise<NextResponse> {
   try {
-    const token = await getAuthToken()
+    // Get authentication token using existing secure server-side logic
+    const { token, expires_in } = await getAuthToken()
 
     // Get organization and connection info needed for Stack AI API calls
     const orgData = await getOrgInfo(token)
@@ -16,7 +17,7 @@ export async function GET(): Promise<NextResponse> {
     // Return token and connection info for client use
     return NextResponse.json({
       token,
-      expires_in: 3600,
+      expires_in,
       org_id: orgData.org_id,
       connection_id: connection.connection_id,
     })

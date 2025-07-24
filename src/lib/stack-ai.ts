@@ -48,7 +48,7 @@ export async function getGoogleDriveConnection(token: string) {
  * Returns common values needed across API routes
  */
 export async function initStackAIClient() {
-  const token = await getAuthToken()
+  const { token } = await getAuthToken()
   const apiUrl = process.env.STACK_AI_API_URL!
 
   return {

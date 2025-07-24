@@ -5,11 +5,19 @@ import { cookies } from "next/headers"
  */
 
 /**
- * Get authentication token for Stack AI API
+ * Authentication result containing token and expiration info
+ */
+export interface AuthResult {
+  token: string
+  expires_in: number
+}
+
+/**
+ * Get authentication token and expiration info for Stack AI API
  * Handles token caching with HTTP-only cookies for security
  * Automatically refreshes expired tokens
  */
-export async function getAuthToken(): Promise<string> {
+export async function getAuthToken(): Promise<AuthResult> {
   const cookieStore = await cookies()
   const tokenCookie = cookieStore.get("stack_ai_token")
   const expirationCookie = cookieStore.get("stack_ai_expires")
@@ -21,7 +29,11 @@ export async function getAuthToken(): Promise<string> {
 
     // Return cached token if still valid (with 5-minute buffer)
     if (now < expiresAt - 5 * 60 * 1000) {
-      return tokenCookie.value
+      const remainingSeconds = Math.floor((expiresAt - now) / 1000)
+      return {
+        token: tokenCookie.value,
+        expires_in: remainingSeconds,
+      }
     }
   }
 
@@ -75,5 +87,8 @@ export async function getAuthToken(): Promise<string> {
     console.log("Cookie setting skipped in RSC context")
   }
 
-  return data.access_token
+  return {
+    token: data.access_token,
+    expires_in: data.expires_in,
+  }
 }

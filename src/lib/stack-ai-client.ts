@@ -62,7 +62,7 @@ class StackAIClient {
    */
   private async makeRequest(
     endpoint: string,
-    options: RequestInit = {}
+    options: RequestInit = {},
   ): Promise<Response> {
     const authInfo = await this.getAuthInfo()
 
@@ -116,7 +116,7 @@ class StackAIClient {
       (file: RawFileFromAPI): FileItem => ({
         ...file,
         parentId: folderId, // Set parentId to the folder we're fetching from
-      })
+      }),
     )
 
     return {
@@ -132,7 +132,7 @@ class StackAIClient {
   async createKnowledgeBase(
     selectedResourceIds: string[],
     name: string,
-    description: string
+    description: string,
   ): Promise<KnowledgeBase> {
     const authInfo = await this.getAuthInfo()
 
@@ -178,12 +178,12 @@ class StackAIClient {
    * Trigger synchronization/indexing for a Knowledge Base
    */
   async triggerKnowledgeBaseSync(
-    knowledgeBaseId: string
+    knowledgeBaseId: string,
   ): Promise<{ message: string }> {
     const authInfo = await this.getAuthInfo()
 
     const response = await this.makeRequest(
-      `/knowledge_bases/sync/trigger/${knowledgeBaseId}/${authInfo.org_id}`
+      `/knowledge_bases/sync/trigger/${knowledgeBaseId}/${authInfo.org_id}`,
     )
 
     if (!response.ok) {
@@ -201,11 +201,11 @@ class StackAIClient {
    */
   async getKnowledgeBaseStatus(
     knowledgeBaseId: string,
-    resourcePath: string = "/"
+    resourcePath: string = "/",
   ): Promise<KBStatusResponse> {
     const params = new URLSearchParams({ resource_path: resourcePath })
     const response = await this.makeRequest(
-      `/knowledge_bases/${knowledgeBaseId}/resources/children?${params}`
+      `/knowledge_bases/${knowledgeBaseId}/resources/children?${params}`,
     )
 
     if (!response.ok) {
@@ -221,12 +221,12 @@ class StackAIClient {
    */
   async deleteFromKnowledgeBase(
     knowledgeBaseId: string,
-    resourcePath: string
+    resourcePath: string,
   ): Promise<void> {
     const params = new URLSearchParams({ resource_path: resourcePath })
     const response = await this.makeRequest(
       `/knowledge_bases/${knowledgeBaseId}/resources?${params}`,
-      { method: "DELETE" }
+      { method: "DELETE" },
     )
 
     if (!response.ok) {
@@ -252,3 +252,62 @@ class StackAIClient {
 
 // Export singleton instance
 export const stackAIClient = new StackAIClient()
+
+/**
+ * Fetch files from Google Drive connection
+ */
+export async function fetchFiles(folderId?: string): Promise<FilesResponse> {
+  return stackAIClient.fetchFiles(folderId)
+}
+
+/**
+ * Create a new Knowledge Base with selected files
+ */
+export async function createKnowledgeBase(
+  _connectionId: string, // No longer needed, kept for backward compatibility
+  selectedResourceIds: string[],
+  name: string,
+  description: string,
+): Promise<KnowledgeBase> {
+  return stackAIClient.createKnowledgeBase(
+    selectedResourceIds,
+    name,
+    description,
+  )
+}
+
+/**
+ * Trigger synchronization/indexing for a Knowledge Base
+ */
+export async function triggerKnowledgeBaseSync(
+  knowledgeBaseId: string,
+): Promise<{ message: string }> {
+  return stackAIClient.triggerKnowledgeBaseSync(knowledgeBaseId)
+}
+
+/**
+ * Get the current status of files in a Knowledge Base
+ */
+export async function getKnowledgeBaseStatus(
+  knowledgeBaseId: string,
+  resourcePath: string = "/",
+): Promise<KBStatusResponse> {
+  return stackAIClient.getKnowledgeBaseStatus(knowledgeBaseId, resourcePath)
+}
+
+/**
+ * Delete/de-index a resource from a Knowledge Base
+ */
+export async function deleteFromKnowledgeBase(
+  knowledgeBaseId: string,
+  resourcePath: string,
+): Promise<void> {
+  return stackAIClient.deleteFromKnowledgeBase(knowledgeBaseId, resourcePath)
+}
+
+/**
+ * Get all Knowledge Bases for the current organization
+ */
+export async function listKnowledgeBases(): Promise<KnowledgeBase[]> {
+  return stackAIClient.listKnowledgeBases()
+}

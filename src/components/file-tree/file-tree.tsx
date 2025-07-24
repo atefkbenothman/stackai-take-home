@@ -7,7 +7,7 @@ import { FileTreeFooter } from "@/components/file-tree/file-tree-footer"
 import { FileTreeHeader } from "@/components/file-tree/file-tree-header"
 import { FileTreeSkeleton } from "@/components/file-tree/file-tree-skeleton"
 import { FileTreeError } from "@/components/file-tree/file-tree-error"
-import { fetchFiles } from "@/lib/api-client"
+import { fetchFiles } from "@/lib/stack-ai-client"
 import {
   sortFiles,
   searchCachedFiles,

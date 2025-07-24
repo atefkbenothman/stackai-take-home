@@ -3,7 +3,7 @@
 import { useState, useCallback, useEffect } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
-import { fetchFiles } from "@/lib/api-client"
+import { fetchFiles } from "@/lib/stack-ai-client"
 import type { FileItem, FilesResponse } from "@/lib/types"
 
 interface UseFolderOperationsReturn {
