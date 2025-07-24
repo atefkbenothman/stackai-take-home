@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { triggerKnowledgeBaseSyncServer } from "@/lib/api/knowledge-base-server"
+import { initStackAIClient, getOrgInfo } from "@/lib/stack-ai"
 
 /**
  * POST /api/knowledge-bases/[id]/sync - Trigger sync for a Knowledge Base
@@ -18,9 +18,29 @@ export async function POST(
       )
     }
 
-    const result = await triggerKnowledgeBaseSyncServer(knowledgeBaseId)
+    // Initialize Stack AI client
+    const { token, apiUrl } = await initStackAIClient()
 
-    return NextResponse.json(result)
+    // Get organization info (required for sync endpoint)
+    const orgInfo = await getOrgInfo(token)
+
+    // Call Stack AI API to trigger sync
+    const response = await fetch(
+      `${apiUrl}/knowledge_bases/sync/trigger/${knowledgeBaseId}/${orgInfo.org_id}`,
+      {
+        method: "GET", // Note: The API uses GET for triggering sync
+        headers: { Authorization: `Bearer ${token}` },
+      },
+    )
+
+    if (!response.ok) {
+      const error = await response.text()
+      throw new Error(`Failed to trigger sync: ${error}`)
+    }
+
+    // The API returns text, not JSON
+    const result = await response.text()
+    return NextResponse.json({ message: result })
   } catch (error) {
     console.error("Failed to trigger sync:", error)
     return NextResponse.json(

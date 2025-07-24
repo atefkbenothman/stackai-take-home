@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { deleteFromKnowledgeBaseServer } from "@/lib/api/knowledge-base-server"
+import { initStackAIClient } from "@/lib/stack-ai"
 
 /**
  * DELETE /api/knowledge-bases/[id]/resources - De-index a resource from Knowledge Base
@@ -27,7 +27,23 @@ export async function DELETE(
       )
     }
 
-    await deleteFromKnowledgeBaseServer(knowledgeBaseId, resourcePath)
+    // Initialize Stack AI client
+    const { token, apiUrl } = await initStackAIClient()
+
+    // Call Stack AI API to delete resource from Knowledge Base
+    const stackAIParams = new URLSearchParams({ resource_path: resourcePath })
+    const response = await fetch(
+      `${apiUrl}/knowledge_bases/${knowledgeBaseId}/resources?${stackAIParams}`,
+      {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      },
+    )
+
+    if (!response.ok) {
+      const error = await response.text()
+      throw new Error(`Failed to delete resource: ${error}`)
+    }
 
     return NextResponse.json({ success: true })
   } catch (error) {

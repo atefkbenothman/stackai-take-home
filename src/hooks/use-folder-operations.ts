@@ -3,8 +3,8 @@
 import { useState, useCallback, useEffect } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
+import { fetchFiles } from "@/lib/api-client"
 import type { FileItem, FilesResponse } from "@/lib/types"
-import { getFiles } from "@/lib/api/files"
 
 interface UseFolderOperationsReturn {
   isExpanded: boolean
@@ -28,7 +28,7 @@ export function useFolderOperations(item: FileItem): UseFolderOperationsReturn {
     error,
   } = useQuery<FilesResponse, Error>({
     queryKey: ["files", item.resource_id],
-    queryFn: () => getFiles(item.resource_id),
+    queryFn: () => fetchFiles(item.resource_id),
     enabled: isFolder && isExpanded,
     staleTime: 5 * 60 * 1000,
     retry: 2,
@@ -45,7 +45,7 @@ export function useFolderOperations(item: FileItem): UseFolderOperationsReturn {
     queryClient
       .prefetchQuery({
         queryKey: ["files", item.resource_id],
-        queryFn: () => getFiles(item.resource_id),
+        queryFn: () => fetchFiles(item.resource_id),
         staleTime: 5 * 60 * 1000,
       })
       .catch((error) => {

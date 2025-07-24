@@ -43,19 +43,8 @@ export function sortFiles(files: FileItem[], sortBy: SortOption): FileItem[] {
   })
 }
 
-// Memoized cache to avoid repeated computation
-let cachedFiles: FileItem[] = []
-let lastCacheTimestamp = 0
-
 export function getAllCachedFiles(queryClient: QueryClient): FileItem[] {
   const cache = queryClient.getQueryCache()
-  const currentTimestamp = Date.now()
-
-  // Only recompute if cache has been updated (check every 100ms minimum)
-  if (currentTimestamp - lastCacheTimestamp < 100) {
-    return cachedFiles
-  }
-
   const allFiles: FileItem[] = []
 
   // Get all cached queries that match our files pattern
@@ -71,8 +60,6 @@ export function getAllCachedFiles(queryClient: QueryClient): FileItem[] {
     }
   })
 
-  cachedFiles = allFiles
-  lastCacheTimestamp = currentTimestamp
   return allFiles
 }
 
@@ -100,9 +87,10 @@ export function getUniqueExtensions(files: FileItem[]): string[] {
   files.forEach((file) => {
     if (file.inode_type === "file") {
       const fileName = file.inode_path.path
-      const extension = fileName.split(".").pop()?.toLowerCase()
-      if (extension && extension !== fileName.toLowerCase()) {
-        extensions.add(extension)
+      const lastDot = fileName.lastIndexOf(".")
+      if (lastDot > 0) {
+        // Must have extension and not start with dot
+        extensions.add(fileName.slice(lastDot + 1).toLowerCase())
       }
     }
   })
@@ -126,4 +114,18 @@ export function filterByExtension(
     // Match exact extension (case-insensitive)
     return fileExtension === extension.toLowerCase()
   })
+}
+
+/**
+ * Helper to generate a Knowledge Base name from selected files
+ */
+export function generateKnowledgeBaseName(selectedFileNames: string[]): string {
+  const timestamp = new Date().toISOString().split("T")[0]
+  if (selectedFileNames.length === 1) {
+    return `KB - ${selectedFileNames[0]} - ${timestamp}`
+  } else if (selectedFileNames.length <= 3) {
+    return `KB - ${selectedFileNames.join(", ")} - ${timestamp}`
+  } else {
+    return `KB - ${selectedFileNames.length} files - ${timestamp}`
+  }
 }

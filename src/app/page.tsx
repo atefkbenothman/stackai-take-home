@@ -6,14 +6,14 @@ import {
 } from "@tanstack/react-query"
 import { FileTree } from "@/components/file-tree/file-tree"
 import { FileTreeSkeleton } from "@/components/file-tree/file-tree-skeleton"
-import { getFilesServer } from "@/lib/api/files-server"
+import { fetchFiles } from "@/lib/api-client"
 import { FileTreeError } from "@/components/file-tree/file-tree-error"
 
 async function FileTreeData() {
   const queryClient = new QueryClient()
 
   try {
-    const rootData = await getFilesServer()
+    const rootData = await fetchFiles()
     await queryClient.prefetchQuery({
       queryKey: ["files"],
       queryFn: () => rootData,

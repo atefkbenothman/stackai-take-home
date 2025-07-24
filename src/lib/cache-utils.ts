@@ -2,6 +2,24 @@ import type { QueryClient, Query } from "@tanstack/react-query"
 import type { FileItem, FilesResponse, IndexingStatus } from "@/lib/types"
 
 /**
+ * Map KB resource status to our IndexingStatus
+ */
+export function mapKBStatusToIndexingStatus(
+  kbStatus?: string,
+): "pending" | "indexing" | "indexed" | "error" {
+  switch (kbStatus) {
+    case "pending":
+      return "indexing" // API "pending" means actively being processed = UI "indexing"
+    case "indexed":
+      return "indexed"
+    case "error":
+      return "error"
+    default:
+      return "indexing" // Default to indexing since we're polling an active KB
+  }
+}
+
+/**
  * Shared utility to update file indexing status in TanStack Query cache
  * This updates all relevant file caches to maintain consistency
  */
@@ -19,11 +37,14 @@ export function updateFileIndexingStatus(
       ...oldData,
       files: oldData.files.map((file: FileItem) =>
         file.resource_id === resourceId
-          ? { 
-              ...file, 
-              indexingStatus: status, 
+          ? {
+              ...file,
+              indexingStatus: status,
               indexingError: error,
-              lastIndexedAt: status === "indexed" ? new Date().toISOString() : file.lastIndexedAt
+              lastIndexedAt:
+                status === "indexed"
+                  ? new Date().toISOString()
+                  : file.lastIndexedAt,
             }
           : file,
       ),
@@ -43,11 +64,14 @@ export function updateFileIndexingStatus(
             ...oldData,
             files: oldData.files.map((file: FileItem) =>
               file.resource_id === resourceId
-                ? { 
-                    ...file, 
-                    indexingStatus: status, 
+                ? {
+                    ...file,
+                    indexingStatus: status,
                     indexingError: error,
-                    lastIndexedAt: status === "indexed" ? new Date().toISOString() : file.lastIndexedAt
+                    lastIndexedAt:
+                      status === "indexed"
+                        ? new Date().toISOString()
+                        : file.lastIndexedAt,
                   }
                 : file,
             ),

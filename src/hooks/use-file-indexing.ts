@@ -3,13 +3,17 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { useState, useEffect } from "react"
 import { toast } from "sonner"
+import { generateKnowledgeBaseName } from "@/lib/utils"
+import {
+  updateFileIndexingStatus,
+  mapKBStatusToIndexingStatus,
+} from "@/lib/cache-utils"
 import {
   createKnowledgeBase,
   triggerKnowledgeBaseSync,
-  generateKnowledgeBaseName,
   getKnowledgeBaseStatus,
-} from "@/lib/api/knowledge-base"
-import { updateFileIndexingStatus } from "@/lib/cache-utils"
+  fetchFiles,
+} from "@/lib/api-client"
 import type { FileItem, KBResource } from "@/lib/types"
 
 interface UseFileIndexingReturn {
@@ -19,30 +23,9 @@ interface UseFileIndexingReturn {
   isActive: boolean
 }
 
-// Map KB resource status to our IndexingStatus
-function mapKBStatusToIndexingStatus(
-  kbStatus?: string,
-): "pending" | "indexing" | "indexed" | "error" {
-  switch (kbStatus) {
-    case "pending":
-      return "indexing" // API "pending" means actively being processed = UI "indexing"
-    case "indexed":
-      return "indexed"
-    case "error":
-      return "error"
-    default:
-      return "indexing" // Default to indexing since we're polling an active KB
-  }
-}
-
-// Extracted API function for the mutation
 async function indexFilesAPI(selectedItems: FileItem[]) {
   // Get connection info from the files API
-  const filesResponse = await fetch("/api/files")
-  if (!filesResponse.ok) {
-    throw new Error("Failed to get connection information")
-  }
-  const filesData = await filesResponse.json()
+  const filesData = await fetchFiles()
   const connectionId = filesData.connection_id
 
   if (!connectionId) {
@@ -79,6 +62,7 @@ export function useFileIndexing(): UseFileIndexingReturn {
   const [activeIndexing, setActiveIndexing] = useState<{
     knowledgeBaseId: string
     selectedFiles: FileItem[]
+    startTime: number
   } | null>(null)
 
   // Knowledge Base creation mutation
@@ -90,11 +74,14 @@ export function useFileIndexing(): UseFileIndexingReturn {
         throw new Error("No files selected")
       }
 
+      // Prevent multiple simultaneous indexing operations
+      if (activeIndexing) {
+        toast.error("Another indexing operation is already in progress")
+        throw new Error("Indexing already in progress")
+      }
+
       // Optimistically update all selected files to "pending" status
       selectedItems.forEach((item) => {
-        console.log(
-          `[DEBUG] Setting file ${item.resource_id} to "pending" (optimistic)`,
-        )
         updateFileIndexingStatus(queryClient, item.resource_id, "pending")
       })
 
@@ -104,15 +91,8 @@ export function useFileIndexing(): UseFileIndexingReturn {
     onSuccess: (data) => {
       const { kb, selectedItems, kbName } = data
 
-      console.log(
-        `[DEBUG] KB created successfully: ${kb.knowledge_base_id}, starting status polling`,
-      )
-
       // Immediately set files to "indexing" status since KB creation succeeded
       selectedItems.forEach((item) => {
-        console.log(
-          `[DEBUG] Setting file ${item.resource_id} to "indexing" (KB created)`,
-        )
         updateFileIndexingStatus(queryClient, item.resource_id, "indexing")
       })
 
@@ -120,6 +100,7 @@ export function useFileIndexing(): UseFileIndexingReturn {
       setActiveIndexing({
         knowledgeBaseId: kb.knowledge_base_id,
         selectedFiles: selectedItems,
+        startTime: Date.now(),
       })
 
       toast.success(
@@ -127,8 +108,6 @@ export function useFileIndexing(): UseFileIndexingReturn {
       )
     },
     onError: (error, selectedItems) => {
-      console.error("Failed to index files:", error)
-
       // Rollback optimistic updates - set files back to "error"
       selectedItems.forEach((item) => {
         updateFileIndexingStatus(
@@ -145,12 +124,8 @@ export function useFileIndexing(): UseFileIndexingReturn {
     },
   })
 
-  // Status polling query (consolidated from useIndexingStatus)
-  const {
-    data: kbStatusData,
-    isLoading: isPollingQuery,
-    error: pollingError,
-  } = useQuery({
+  // Status polling query
+  const { data: kbStatusData, isLoading: isPollingQuery } = useQuery({
     queryKey: ["kb-status", activeIndexing?.knowledgeBaseId],
     queryFn: async () => {
       if (!activeIndexing?.knowledgeBaseId) return null
@@ -166,14 +141,10 @@ export function useFileIndexing(): UseFileIndexingReturn {
       }
     },
     enabled: !!activeIndexing,
-    refetchInterval: 1000, // Poll every 1 second to catch brief "indexing" status
+    refetchInterval: 3000, // Poll every 3 seconds to catch brief "indexing" status
     refetchIntervalInBackground: true,
     retry: 2,
   })
-
-  if (pollingError) {
-    console.error("Status polling query error:", pollingError)
-  }
 
   // Update file status in cache when polling data changes
   useEffect(() => {
@@ -193,14 +164,7 @@ export function useFileIndexing(): UseFileIndexingReturn {
 
       if (kbResource?.status) {
         const indexingStatus = mapKBStatusToIndexingStatus(kbResource.status)
-        console.log(
-          `[DEBUG] File ${file.resource_id}: API status "${kbResource.status}" -> UI status "${indexingStatus}"`,
-        )
         updateFileIndexingStatus(queryClient, file.resource_id, indexingStatus)
-      } else {
-        console.log(
-          `[DEBUG] File ${file.resource_id}: No status found in KB response`,
-        )
       }
     })
   }, [kbStatusData, activeIndexing, queryClient])
@@ -220,13 +184,40 @@ export function useFileIndexing(): UseFileIndexingReturn {
       })
     : false
 
-  // Stop polling when all files are completed
+  // Stop polling when all files are completed or timeout reached
   useEffect(() => {
     if (allFilesCompleted && activeIndexing) {
       setActiveIndexing(null)
       toast.success("Indexing completed!")
     }
   }, [allFilesCompleted, activeIndexing])
+
+  // Timeout after 5 minutes to prevent infinite polling
+  useEffect(() => {
+    if (!activeIndexing) return
+
+    const timeoutMs = 5 * 60 * 1000 // 5 minutes
+    const elapsed = Date.now() - activeIndexing.startTime
+
+    if (elapsed >= timeoutMs) {
+      setActiveIndexing(null)
+      toast.error(
+        "Indexing timed out after 5 minutes. Please check status manually.",
+      )
+      return
+    }
+
+    // Set up timeout for remaining time
+    const remainingTime = timeoutMs - elapsed
+    const timeoutId = setTimeout(() => {
+      setActiveIndexing(null)
+      toast.error(
+        "Indexing timed out after 5 minutes. Please check status manually.",
+      )
+    }, remainingTime)
+
+    return () => clearTimeout(timeoutId)
+  }, [activeIndexing])
 
   const isIndexing = mutation.isPending
   const isPolling = isPollingQuery && !!activeIndexing

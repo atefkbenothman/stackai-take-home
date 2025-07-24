@@ -1,4 +1,29 @@
-import { KnowledgeBase, KBStatusResponse } from "@/lib/types"
+import type {
+  FilesResponse,
+  KnowledgeBase,
+  KBStatusResponse,
+} from "@/lib/types"
+
+/**
+ * Fetch files from Google Drive connection
+ */
+export async function fetchFiles(folderId?: string): Promise<FilesResponse> {
+  const baseUrl =
+    typeof window !== "undefined"
+      ? window.location.origin
+      : process.env.VERCEL_URL
+        ? `https://${process.env.VERCEL_URL}`
+        : "http://localhost:3000"
+
+  const url = `${baseUrl}/api/files${folderId ? `?folderId=${folderId}` : ""}`
+  const response = await fetch(url)
+
+  if (!response.ok) {
+    throw new Error(`Failed to fetch files: ${response.status}`)
+  }
+
+  return response.json()
+}
 
 /**
  * Create a new Knowledge Base with selected files
@@ -94,62 +119,6 @@ export async function listKnowledgeBases(): Promise<KnowledgeBase[]> {
   if (!response.ok) {
     const error = await response.text()
     throw new Error(`Failed to list knowledge bases: ${error}`)
-  }
-
-  return response.json()
-}
-
-/**
- * Helper function to create default indexing parameters
- */
-export function getDefaultIndexingParams() {
-  return {
-    ocr: false,
-    unstructured: true,
-    embedding_params: {
-      embedding_model: "text-embedding-ada-002",
-      api_key: null,
-    },
-    chunker_params: {
-      chunk_size: 1500,
-      chunk_overlap: 500,
-      chunker: "sentence",
-    },
-  }
-}
-
-/**
- * Helper to generate a Knowledge Base name from selected files
- */
-export function generateKnowledgeBaseName(selectedFileNames: string[]): string {
-  const timestamp = new Date().toISOString().split("T")[0]
-  if (selectedFileNames.length === 1) {
-    return `KB - ${selectedFileNames[0]} - ${timestamp}`
-  } else if (selectedFileNames.length <= 3) {
-    return `KB - ${selectedFileNames.join(", ")} - ${timestamp}`
-  } else {
-    return `KB - ${selectedFileNames.length} files - ${timestamp}`
-  }
-}
-
-/**
- * Check if a file path is already indexed in any Knowledge Base
- * This would typically call an endpoint to check across all KBs
- */
-export async function checkIfFileIsIndexed(
-  filePath: string,
-): Promise<{ isIndexed: boolean; knowledgeBaseId?: string }> {
-  const response = await fetch(
-    `/api/knowledge-bases/check-indexed?${new URLSearchParams({ file_path: filePath })}`,
-  )
-
-  if (!response.ok) {
-    // If endpoint doesn't exist yet, return not indexed
-    if (response.status === 404) {
-      return { isIndexed: false }
-    }
-    const error = await response.text()
-    throw new Error(`Failed to check indexed status: ${error}`)
   }
 
   return response.json()
