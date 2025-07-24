@@ -186,7 +186,7 @@ export function SelectionProvider({ children }: SelectionProviderProps) {
     [selectionState.selectedIds],
   )
 
-  const contextValue: SelectionContextType = {
+  const contextValue: SelectionContextType = useMemo(() => ({
     ...selectionState,
     toggleSelection,
     toggleFolderSelection,
@@ -196,7 +196,17 @@ export function SelectionProvider({ children }: SelectionProviderProps) {
     isIndeterminate,
     getSelectedItems,
     getSelectionSummary: () => getSelectionSummary,
-  }
+  }), [
+    selectionState,
+    toggleSelection,
+    toggleFolderSelection,
+    selectAll,
+    clearSelection,
+    isSelected,
+    isIndeterminate,
+    getSelectedItems,
+    getSelectionSummary,
+  ])
 
   return (
     <SelectionContext.Provider value={contextValue}>

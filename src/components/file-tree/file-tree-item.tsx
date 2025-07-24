@@ -1,12 +1,13 @@
 "use client"
 
+import React from "react"
 import { Plus, Minus, Folder, FolderOpen, File } from "lucide-react"
-import { toast } from "sonner"
-import { useEffect, useRef, useState } from "react"
-import { useQueryClient } from "@tanstack/react-query"
-import type { FileItem, FilesResponse } from "@/lib/types"
+import type { FileItem } from "@/lib/types"
 import { FileSkeleton } from "@/components/file-tree/file-skeleton"
-import { getFiles } from "@/lib/api/files"
+import { useSelection } from "@/contexts/selection-context"
+import { Checkbox } from "@/components/ui/checkbox"
+import { useFolderExpansion } from "@/hooks/use-folder-expansion"
+import { useFolderPrefetch } from "@/hooks/use-folder-prefetch"
 
 interface FileTreeItemProps {
   item: FileItem
@@ -15,110 +16,70 @@ interface FileTreeItemProps {
 
 export function FileTreeItem({ item, level = 0 }: FileTreeItemProps) {
   const isFolder = item.inode_type === "directory"
-  const queryClient = useQueryClient()
-  const prefetchedFolders = useRef(new Set<string>())
 
-  const [isExpanded, setIsExpanded] = useState(false)
-  const [folderData, setFolderData] = useState<FilesResponse | null>(null)
-  const [isLoading, setIsLoading] = useState(false)
-  const [error, setError] = useState<Error | null>(null)
+  const {
+    isSelected,
+    toggleSelection,
+    toggleFolderSelection,
+    isIndeterminate,
+  } = useSelection()
 
-  // Prefetch folder contents
-  const prefetchFolder = async (folderId: string) => {
-    // Skip if already prefetched or expanded
-    if (prefetchedFolders.current.has(folderId)) {
-      return
-    }
-
-    if (isExpanded) {
-      return
-    }
-
-    try {
-      await queryClient.prefetchQuery({
-        queryKey: ["files", folderId],
-        queryFn: () => getFiles(folderId),
-        staleTime: 5 * 60 * 1000,
-      })
-
-      prefetchedFolders.current.add(folderId)
-    } catch (error) {
-      console.debug("Prefetch failed for folder:", folderId, error)
-    }
-  }
-
-  // Fetch folder data with cache-first approach
-  const fetchFolderData = async (folderId: string) => {
-    // Check cache first
-    const cachedData = queryClient.getQueryData<FilesResponse>([
-      "files",
-      folderId,
-    ])
-    if (cachedData) {
-      setFolderData(cachedData)
-      setIsLoading(false)
-      setError(null)
-      return
-    }
-
-    // Fetch from server if not in cache
-    setIsLoading(true)
-    setError(null)
-
-    try {
-      const data = await queryClient.fetchQuery({
-        queryKey: ["files", folderId],
-        queryFn: () => getFiles(folderId),
-        staleTime: 5 * 60 * 1000, // 5 minutes
-      })
-      setFolderData(data)
-    } catch (err) {
-      setError(err instanceof Error ? err : new Error("Unknown error occurred"))
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  const handleToggle = () => {
-    if (!isFolder) return
-    const wasExpanded = isExpanded
-    setIsExpanded(!isExpanded)
-
-    if (!wasExpanded) {
-      fetchFolderData(item.resource_id)
-    } else {
-      // Clear data when collapsing to save memory
-      setFolderData(null)
-      setError(null)
-    }
-  }
-
-  const handleMouseEnter = () => {
-    if (isFolder && !isExpanded) {
-      prefetchFolder(item.resource_id)
-    }
-  }
-
-  // Show toast notification for errors
-  useEffect(() => {
-    if (error) {
-      toast.error(`Failed to load folder: ${item.inode_path.path}`, {
-        action: {
-          label: "Retry",
-          onClick: () => fetchFolderData(item.resource_id),
-        },
+  // Auto-select children if this folder was marked for selection intent
+  const handleSelectionIntent = (children: FileItem[]) => {
+    if (isSelected(item.resource_id)) {
+      // This folder is selected, so auto-select all its children
+      children.forEach((child) => {
+        if (!isSelected(child.resource_id)) {
+          toggleSelection(child)
+        }
       })
     }
-  }, [error, item.inode_path.path, item.resource_id])
+  }
+
+  const { isExpanded, folderData, isLoading, error, handleToggle } =
+    useFolderExpansion({
+      folderId: item.resource_id,
+      isFolder,
+      folderName: item.inode_path.path,
+      onSelectionIntent: handleSelectionIntent,
+    })
+
+  const { handleMouseEnter } = useFolderPrefetch({
+    folderId: item.resource_id,
+    isFolder,
+    isExpanded,
+  })
+
+  const itemIsSelected = isSelected(item.resource_id)
+  const itemIsIndeterminate = isFolder
+    ? isIndeterminate(item.resource_id, folderData?.files || [])
+    : false
 
   return (
     <div>
       <div
-        className="flex cursor-pointer items-center px-2 py-1 transition-colors hover:bg-gray-50"
+        className={`flex cursor-pointer items-center px-2 py-1 transition-colors hover:bg-gray-50 ${
+          itemIsSelected ? "bg-blue-50" : ""
+        }`}
         style={{ paddingLeft: `${level * 20 + 8}px` }}
         onClick={handleToggle}
         onMouseEnter={handleMouseEnter}
       >
+        <Checkbox
+          checked={itemIsSelected}
+          // @ts-ignore - Radix checkbox supports indeterminate but types might not reflect it
+          indeterminate={itemIsIndeterminate || undefined}
+          onCheckedChange={() => {
+            if (isFolder && folderData?.files) {
+              toggleFolderSelection(item, folderData.files)
+            } else {
+              toggleSelection(item)
+            }
+          }}
+          onClick={(e) => e.stopPropagation()}
+          className="mr-2 hover:cursor-pointer"
+        />
+
         <div className="mr-2 flex h-4 w-4 items-center justify-center text-gray-500">
           {isFolder ? (
             isExpanded ? (
