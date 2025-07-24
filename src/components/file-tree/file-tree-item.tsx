@@ -6,8 +6,7 @@ import type { FileItem } from "@/lib/types"
 import { FileSkeleton } from "@/components/file-tree/file-skeleton"
 import { useSelection } from "@/contexts/selection-context"
 import { Checkbox } from "@/components/ui/checkbox"
-import { useFolderExpansion } from "@/hooks/use-folder-expansion"
-import { useFolderPrefetch } from "@/hooks/use-folder-prefetch"
+import { useFolderOperations } from "@/hooks/use-folder-operations"
 
 interface FileTreeItemProps {
   item: FileItem
@@ -24,18 +23,14 @@ export function FileTreeItem({ item, level = 0 }: FileTreeItemProps) {
     isIndeterminate,
   } = useSelection()
 
-  const { isExpanded, folderData, isLoading, error, handleToggle } =
-    useFolderExpansion({
-      folderId: item.resource_id,
-      isFolder,
-      folderName: item.inode_path.path,
-    })
-
-  const { handleMouseEnter } = useFolderPrefetch({
-    folderId: item.resource_id,
-    isFolder,
+  const {
     isExpanded,
-  })
+    folderData,
+    isLoading,
+    error,
+    toggleExpansion,
+    prefetch,
+  } = useFolderOperations(item)
 
   const itemIsSelected = isSelected(item.resource_id)
   const itemIsIndeterminate = isFolder
@@ -45,12 +40,12 @@ export function FileTreeItem({ item, level = 0 }: FileTreeItemProps) {
   return (
     <div>
       <div
-        className={`flex cursor-pointer items-center px-2 py-1 transition-colors hover:bg-gray-50 ${
+        className={`flex cursor-pointer items-center border-b px-2 py-1 transition-colors hover:bg-gray-50 ${
           itemIsSelected ? "bg-blue-50" : ""
         }`}
         style={{ paddingLeft: `${level * 20 + 8}px` }}
-        onClick={handleToggle}
-        onMouseEnter={handleMouseEnter}
+        onClick={toggleExpansion}
+        onMouseEnter={prefetch}
       >
         <Checkbox
           checked={itemIsIndeterminate ? "indeterminate" : itemIsSelected}
@@ -96,7 +91,7 @@ export function FileTreeItem({ item, level = 0 }: FileTreeItemProps) {
 
       {isFolder && isExpanded && (
         <div className="animate-in slide-in-from-left-1 duration-150">
-          {isLoading && <FileSkeleton level={level + 1} />}
+          {isLoading && <FileSkeleton level={level + 1} count={1} />}
           {!isLoading && !error && folderData?.files && (
             <div>
               {folderData.files.map((childFile: FileItem) => (

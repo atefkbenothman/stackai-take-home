@@ -14,10 +14,12 @@ export function FileTree({ files }: FileTreeProps) {
       <div className="flex h-10 items-center border-b bg-gray-200 p-2">
         <h2 className="text-sm font-semibold text-gray-700">File Picker</h2>
       </div>
-      <div className="my-2 h-[500px] overflow-y-auto">
-        {files.map((file) => (
-          <FileTreeItem key={file.resource_id} item={file} level={0} />
-        ))}
+      <div className="h-[500px] overflow-y-auto">
+        <>
+          {files.map((file) => (
+            <FileTreeItem key={file.resource_id} item={file} level={0} />
+          ))}
+        </>
       </div>
       <SelectionSummary allFiles={files} />
     </div>

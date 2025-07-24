@@ -1,3 +1,4 @@
+import { Suspense } from "react"
 import {
   dehydrate,
   HydrationBoundary,
@@ -6,35 +7,38 @@ import {
 import { FileTree } from "@/components/file-tree/file-tree"
 import { FileTreeSkeleton } from "@/components/file-tree/file-tree-skeleton"
 import { getFilesServer } from "@/lib/api/files-server"
-import type { FilesResponse } from "@/lib/types"
+import { FileError } from "@/components/file-tree/file-error"
 
-export default async function Home() {
+async function FileTreeData() {
   const queryClient = new QueryClient()
-  let rootData: FilesResponse | null = null
 
   try {
-    rootData = await getFilesServer()
+    const rootData = await getFilesServer()
     await queryClient.prefetchQuery({
       queryKey: ["files"],
       queryFn: () => rootData,
     })
-  } catch (error) {
-    console.error("Failed to fetch root files:", error)
+
+    const dehydratedState = dehydrate(queryClient)
+
+    return (
+      <HydrationBoundary state={dehydratedState}>
+        <FileTree files={rootData.files} />
+      </HydrationBoundary>
+    )
+  } catch {
+    return <FileError />
   }
+}
 
-  const dehydratedState = dehydrate(queryClient)
-
+export default function Home() {
   return (
-    <HydrationBoundary state={dehydratedState}>
-      <div className="flex min-h-screen items-center justify-center p-4">
-        <div className="w-full max-w-4xl">
-          {rootData ? (
-            <FileTree files={rootData.files} />
-          ) : (
-            <FileTreeSkeleton count={12} />
-          )}
-        </div>
+    <div className="flex min-h-screen items-center justify-center p-4">
+      <div className="w-full max-w-4xl">
+        <Suspense fallback={<FileTreeSkeleton count={12} />}>
+          <FileTreeData />
+        </Suspense>
       </div>
-    </HydrationBoundary>
+    </div>
   )
 }
