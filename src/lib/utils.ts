@@ -30,13 +30,6 @@ export type SortOption = 'name' | 'date'
 
 export function sortFiles(files: FileItem[], sortBy: SortOption): FileItem[] {
   return [...files].sort((a, b) => {
-    // Always sort folders before files
-    if (a.inode_type !== b.inode_type) {
-      if (a.inode_type === 'directory') return -1
-      if (b.inode_type === 'directory') return 1
-    }
-    
-    // Within the same type (folder or file), sort by the specified option
     if (sortBy === 'name') {
       return a.inode_path.path.localeCompare(b.inode_path.path, undefined, { 
         numeric: true, 
