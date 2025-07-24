@@ -51,7 +51,17 @@ export function FileTreeItem({ item, level = 0 }: FileTreeItemProps) {
           checked={itemIsIndeterminate ? "indeterminate" : itemIsSelected}
           onCheckedChange={() => {
             if (isFolder && folderData?.files) {
-              toggleFolderSelection(item, folderData.files)
+              // Additional validation: ensure we're only passing children that belong to this specific folder
+              const folderPath = item.inode_path.path
+              const validChildren = folderData.files.filter((child) => {
+                const childPath = child.inode_path.path
+                // Ensure child belongs to this specific folder and is a direct child
+                return (
+                  childPath.startsWith(folderPath + "/") &&
+                  !childPath.substring(folderPath.length + 1).includes("/")
+                )
+              })
+              toggleFolderSelection(item, validChildren)
             } else {
               toggleSelection(item)
             }
@@ -85,6 +95,29 @@ export function FileTreeItem({ item, level = 0 }: FileTreeItemProps) {
             {item.inode_path.path}
           </span>
         </div>
+
+        {/* Indexing status indicator */}
+        {item.indexingStatus && (
+          <div className="ml-2 flex items-center">
+            <span className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${
+              item.indexingStatus === "pending" 
+                ? "bg-yellow-100 text-yellow-800"
+                : item.indexingStatus === "indexing"
+                ? "bg-blue-100 text-blue-800"
+                : item.indexingStatus === "indexed"
+                ? "bg-green-100 text-green-800"
+                : item.indexingStatus === "error"
+                ? "bg-red-100 text-red-800"
+                : "bg-gray-100 text-gray-800"
+            }`}>
+              {item.indexingStatus === "pending" && "⏳ Pending"}
+              {item.indexingStatus === "indexing" && "🔄 Indexing"}
+              {item.indexingStatus === "indexed" && "✅ Indexed"}
+              {item.indexingStatus === "error" && "❌ Error"}
+              {item.indexingStatus === "not-indexed" && "○ Not Indexed"}
+            </span>
+          </div>
+        )}
       </div>
 
       {isFolder && isExpanded && (

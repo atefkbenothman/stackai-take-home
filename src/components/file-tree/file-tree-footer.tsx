@@ -2,6 +2,7 @@
 
 import { X } from "lucide-react"
 import { useSelection } from "@/hooks/use-selection"
+import { useIndexing } from "@/hooks/use-indexing"
 import { Button } from "@/components/ui/button"
 import type { FileItem } from "@/lib/types"
 import { useCallback } from "react"
@@ -11,13 +12,20 @@ interface FileTreeFooterProps {
 }
 
 export function FileTreeFooter({ allFiles = [] }: FileTreeFooterProps) {
-  const { getSelectionSummary, clearSelection, selectAll } = useSelection()
+  const { getSelectionSummary, clearSelection, selectAll, getMinimalSelectedItems } = useSelection()
+  const { indexFiles, isIndexing } = useIndexing()
 
   const summary = getSelectionSummary()
 
   const handleSelectAll = useCallback(() => {
     selectAll(allFiles)
   }, [selectAll, allFiles])
+
+  const handleIndexFiles = useCallback(() => {
+    const selectedItems = getMinimalSelectedItems()
+    indexFiles(selectedItems)
+    clearSelection()
+  }, [getMinimalSelectedItems, indexFiles, clearSelection])
 
   return (
     <div className="flex h-8 items-center border-t bg-gray-50 p-2">
@@ -41,15 +49,26 @@ export function FileTreeFooter({ allFiles = [] }: FileTreeFooterProps) {
         )}
 
         {summary.count > 0 && (
-          <Button
-            onClick={clearSelection}
-            variant="secondary"
-            size="sm"
-            className="h-6 rounded-xs px-2 text-xs hover:cursor-pointer"
-          >
-            <X size={12} className="mr-1" />
-            Clear
-          </Button>
+          <>
+            <Button
+              onClick={handleIndexFiles}
+              disabled={isIndexing}
+              size="sm"
+              className="h-6 rounded-xs px-2 text-xs hover:cursor-pointer"
+            >
+              {isIndexing ? "Indexing..." : "Index Selected Files"}
+            </Button>
+            
+            <Button
+              onClick={clearSelection}
+              variant="secondary"
+              size="sm"
+              className="h-6 rounded-xs px-2 text-xs hover:cursor-pointer"
+            >
+              <X size={12} className="mr-1" />
+              Clear
+            </Button>
+          </>
         )}
       </div>
     </div>

@@ -23,7 +23,7 @@ async function FileTreeData() {
 
     return (
       <HydrationBoundary state={dehydratedState}>
-        <FileTree files={rootData.files} />
+        <FileTree />
       </HydrationBoundary>
     )
   } catch {

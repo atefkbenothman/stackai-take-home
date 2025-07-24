@@ -64,14 +64,28 @@ export function SelectionProvider({ children }: SelectionProviderProps) {
         const newFolderSelectionIntent = new Set(prev.folderSelectionIntent)
 
         const isCurrentlySelected = prev.selectedIds.has(folder.resource_id)
+        const folderPath = folder.inode_path.path
+
+        // Filter children to only include direct descendants of this specific folder
+        const validChildren = children.filter((child) => {
+          const childPath = child.inode_path.path
+          // Check if child path starts with the folder path followed by a slash
+          // and doesn't have additional nested folders (direct children only)
+          if (!childPath.startsWith(folderPath + "/")) {
+            return false
+          }
+          // Ensure it's a direct child (no additional slashes after the folder path)
+          const relativePath = childPath.substring(folderPath.length + 1)
+          return !relativePath.includes("/")
+        })
 
         if (isCurrentlySelected) {
-          // Deselect folder and all children recursively
+          // Deselect folder and all valid children recursively
           newSelectedIds.delete(folder.resource_id)
           newSelectedItems.delete(folder.resource_id)
           newFolderSelectionIntent.delete(folder.resource_id)
 
-          // Recursively deselect all children
+          // Recursively deselect all valid children
           const deselectedChildren = (items: FileItem[]) => {
             items.forEach((child) => {
               newSelectedIds.delete(child.resource_id)
@@ -79,14 +93,14 @@ export function SelectionProvider({ children }: SelectionProviderProps) {
               newFolderSelectionIntent.delete(child.resource_id)
             })
           }
-          deselectedChildren(children)
+          deselectedChildren(validChildren)
         } else {
-          // Select folder and all children recursively
+          // Select folder and all valid children recursively
           newSelectedIds.add(folder.resource_id)
           newSelectedItems.set(folder.resource_id, folder)
           newFolderSelectionIntent.add(folder.resource_id)
 
-          // Recursively select all children
+          // Recursively select all valid children
           const selectChildren = (items: FileItem[]) => {
             items.forEach((child) => {
               newSelectedIds.add(child.resource_id)
@@ -97,7 +111,7 @@ export function SelectionProvider({ children }: SelectionProviderProps) {
               }
             })
           }
-          selectChildren(children)
+          selectChildren(validChildren)
         }
 
         return {
@@ -198,6 +212,19 @@ export function SelectionProvider({ children }: SelectionProviderProps) {
 
       const folderPath = folder.inode_path.path
 
+      // Filter children to only include direct descendants of this specific folder
+      const validChildren = children.filter((child) => {
+        const childPath = child.inode_path.path
+        // Check if child path starts with the folder path followed by a slash
+        // and doesn't have additional nested folders (direct children only)
+        if (!childPath.startsWith(folderPath + "/")) {
+          return false
+        }
+        // Ensure it's a direct child (no additional slashes after the folder path)
+        const relativePath = childPath.substring(folderPath.length + 1)
+        return !relativePath.includes("/")
+      })
+
       // Check if any selected item is a descendant of this folder
       const selectedDescendants = Array.from(
         selectionState.selectedItems.values(),
@@ -212,12 +239,12 @@ export function SelectionProvider({ children }: SelectionProviderProps) {
       }
 
       // Has at least one descendant selected
-      // If we have children data, check if all immediate children are selected
-      if (children.length > 0) {
-        const allChildrenSelected = children.every((child) =>
+      // If we have children data, check if all immediate valid children are selected
+      if (validChildren.length > 0) {
+        const allValidChildrenSelected = validChildren.every((child) =>
           selectionState.selectedIds.has(child.resource_id),
         )
-        return !allChildrenSelected // Indeterminate if not all children selected
+        return !allValidChildrenSelected // Indeterminate if not all valid children selected
       }
 
       // No children data (collapsed), but has descendants selected
