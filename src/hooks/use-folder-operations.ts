@@ -72,14 +72,7 @@ export function useFolderOperations(item: FileItem): UseFolderOperationsReturn {
   // Show toast notification for errors
   useEffect(() => {
     if (error) {
-      toast.error(`Failed to load folder: ${item.inode_path.path}`, {
-        action: {
-          label: "Retry",
-          onClick: () => {
-            queryClient.invalidateQueries({ queryKey })
-          },
-        },
-      })
+      toast.error(`Failed to load folder: ${item.inode_path.path}`)
     }
   }, [error, item.inode_path.path, queryClient, queryKey])
 

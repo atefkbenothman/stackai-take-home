@@ -80,7 +80,7 @@ export function FileTreeHeader({
 
   return (
     <div className="flex h-10 items-center justify-between border-b bg-gray-200 p-2">
-      <h2 className="text-sm font-semibold text-gray-700">File Picker</h2>
+      <h2 className="text-md font-semibold text-gray-700">File Picker</h2>
 
       <div className="flex items-center gap-2">
         <DropdownMenu>

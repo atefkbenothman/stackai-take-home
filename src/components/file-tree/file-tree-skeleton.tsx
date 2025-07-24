@@ -1,3 +1,5 @@
+"use client"
+
 import { FileTreeItemSkeleton } from "@/components/file-tree/file-tree-item-skeleton"
 import { FileTreeFooter } from "@/components/file-tree/file-tree-footer"
 import { FileTreeHeader } from "@/components/file-tree/file-tree-header"
