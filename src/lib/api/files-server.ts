@@ -7,7 +7,9 @@ import type { FilesResponse } from "@/lib/types"
  * Server-side function to get files from Stack AI API
  * This bypasses HTTP requests and calls the API directly from the server
  */
-export async function getFilesServer(folderId?: string): Promise<FilesResponse> {
+export async function getFilesServer(
+  folderId?: string,
+): Promise<FilesResponse> {
   const token = await getAuthToken()
   const apiUrl = process.env.STACK_AI_API_URL!
 

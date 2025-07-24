@@ -1,5 +1,10 @@
 // Indexing status for files
-export type IndexingStatus = 'not-indexed' | 'pending' | 'indexing' | 'indexed' | 'error'
+export type IndexingStatus =
+  | "not-indexed"
+  | "pending"
+  | "indexing"
+  | "indexed"
+  | "error"
 
 export interface FileItem {
   resource_id: string
@@ -90,9 +95,9 @@ export interface CreateKnowledgeBaseRequest {
 // Knowledge Base resource (file/folder in KB)
 export interface KBResource {
   resource_id: string
-  inode_type: 'file' | 'directory'
+  inode_type: "file" | "directory"
   inode_path: { path: string }
-  status?: 'pending' | 'indexing' | 'indexed' | 'error'
+  status?: "pending" | "indexing" | "indexed" | "error"
   created_at?: string
   updated_at?: string
 }
@@ -107,5 +112,5 @@ export interface IndexingOperation {
   knowledgeBaseId: string
   startedAt: string
   selectedFiles: FileItem[]
-  status: 'active' | 'completed' | 'failed'
+  status: "active" | "completed" | "failed"
 }

@@ -1,8 +1,4 @@
-import {
-  CreateKnowledgeBaseRequest,
-  KnowledgeBase,
-  KBStatusResponse,
-} from "@/lib/types"
+import { KnowledgeBase, KBStatusResponse } from "@/lib/types"
 
 /**
  * Create a new Knowledge Base with selected files

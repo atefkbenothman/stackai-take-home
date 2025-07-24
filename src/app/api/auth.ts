@@ -67,10 +67,8 @@ export async function getAuthToken() {
       sameSite: "lax",
       maxAge: data.expires_in,
     })
-  } catch (error) {
-    // Silently skip cookie setting if called from RSC context
-    // The token will still be returned and work for the current request
-    console.log("Cookie setting skipped (likely called from RSC context)")
+  } catch {
+    console.log("Cookie setting skipped")
   }
 
   return data.access_token

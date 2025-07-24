@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from "react"
+import { useState, useCallback, useEffect, useMemo } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
 import type { FileItem, FilesResponse } from "@/lib/types"
@@ -18,13 +18,22 @@ export function useFolderOperations(item: FileItem): UseFolderOperationsReturn {
   const queryClient = useQueryClient()
   const isFolder = item.inode_type === "directory"
 
-  // Query configuration
-  const queryKey = ["files", item.resource_id]
-  const queryFn = () => getFiles(item.resource_id)
-  const staleTime = 5 * 60 * 1000 // 5 minutes
+  const queryKey = useMemo(
+    () => ["files", item.resource_id],
+    [item.resource_id],
+  )
+  const queryFn = useCallback(
+    () => getFiles(item.resource_id),
+    [item.resource_id],
+  )
+  const staleTime = 5 * 60 * 1000
 
   // Fetch folder data when expanded
-  const { data: folderData, isLoading, error } = useQuery<FilesResponse, Error>({
+  const {
+    data: folderData,
+    isLoading,
+    error,
+  } = useQuery<FilesResponse, Error>({
     queryKey,
     queryFn,
     enabled: isFolder && isExpanded,
@@ -32,24 +41,33 @@ export function useFolderOperations(item: FileItem): UseFolderOperationsReturn {
     retry: 2,
   })
 
-  // Toggle expansion state
   const toggleExpansion = useCallback(() => {
     if (!isFolder) return
-    setIsExpanded(prev => !prev)
+    setIsExpanded((prev) => !prev)
   }, [isFolder])
 
   // Prefetch folder data on hover
   const prefetch = useCallback(() => {
     if (!isFolder || isExpanded) return
 
-    queryClient.prefetchQuery({
-      queryKey,
-      queryFn,
-      staleTime,
-    }).catch(error => {
-      console.debug("Prefetch failed for folder:", item.resource_id, error)
-    })
-  }, [isFolder, isExpanded, queryClient, item.resource_id, queryKey, queryFn, staleTime])
+    queryClient
+      .prefetchQuery({
+        queryKey,
+        queryFn,
+        staleTime,
+      })
+      .catch((error) => {
+        console.debug("Prefetch failed for folder:", item.resource_id, error)
+      })
+  }, [
+    isFolder,
+    isExpanded,
+    queryClient,
+    item.resource_id,
+    queryKey,
+    queryFn,
+    staleTime,
+  ])
 
   // Show toast notification for errors
   useEffect(() => {

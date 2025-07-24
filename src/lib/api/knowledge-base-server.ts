@@ -1,7 +1,11 @@
 "use server"
 
 import { getAuthToken } from "@/app/api/auth"
-import type { CreateKnowledgeBaseRequest, KnowledgeBase, KBStatusResponse } from "@/lib/types"
+import type {
+  CreateKnowledgeBaseRequest,
+  KnowledgeBase,
+  KBStatusResponse,
+} from "@/lib/types"
 import { getDefaultIndexingParams } from "./knowledge-base"
 
 /**
@@ -13,7 +17,7 @@ import { getDefaultIndexingParams } from "./knowledge-base"
  */
 export async function getOrgInfo(token: string) {
   const apiUrl = process.env.STACK_AI_API_URL!
-  
+
   const orgResponse = await fetch(`${apiUrl}/organizations/me/current`, {
     headers: { Authorization: `Bearer ${token}` },
   })
@@ -30,7 +34,7 @@ export async function getOrgInfo(token: string) {
  */
 export async function getGoogleDriveConnection(token: string) {
   const apiUrl = process.env.STACK_AI_API_URL!
-  
+
   const connectionResponse = await fetch(
     `${apiUrl}/connections?connection_provider=gdrive&limit=1`,
     {
@@ -58,11 +62,11 @@ export async function createKnowledgeBaseServer(
   connectionId: string,
   selectedResourceIds: string[],
   name: string,
-  description: string
+  description: string,
 ): Promise<KnowledgeBase> {
   const token = await getAuthToken()
   const apiUrl = process.env.STACK_AI_API_URL!
-  
+
   const requestBody: CreateKnowledgeBaseRequest = {
     connection_id: connectionId,
     connection_source_ids: selectedResourceIds,
@@ -72,7 +76,7 @@ export async function createKnowledgeBaseServer(
     org_level_role: null,
     cron_job_id: null,
   }
-  
+
   const response = await fetch(`${apiUrl}/knowledge_bases`, {
     method: "POST",
     headers: {
@@ -81,12 +85,12 @@ export async function createKnowledgeBaseServer(
     },
     body: JSON.stringify(requestBody),
   })
-  
+
   if (!response.ok) {
     const error = await response.text()
     throw new Error(`Failed to create knowledge base: ${error}`)
   }
-  
+
   return response.json()
 }
 
@@ -94,25 +98,25 @@ export async function createKnowledgeBaseServer(
  * Trigger sync for a Knowledge Base
  */
 export async function triggerKnowledgeBaseSyncServer(
-  knowledgeBaseId: string
+  knowledgeBaseId: string,
 ): Promise<{ message: string }> {
   const token = await getAuthToken()
   const apiUrl = process.env.STACK_AI_API_URL!
   const orgInfo = await getOrgInfo(token)
-  
+
   const response = await fetch(
     `${apiUrl}/knowledge_bases/sync/trigger/${knowledgeBaseId}/${orgInfo.org_id}`,
     {
       method: "GET", // Note: The API uses GET for triggering sync
       headers: { Authorization: `Bearer ${token}` },
-    }
+    },
   )
-  
+
   if (!response.ok) {
     const error = await response.text()
     throw new Error(`Failed to trigger sync: ${error}`)
   }
-  
+
   // The API returns text, not JSON
   const result = await response.text()
   return { message: result }
@@ -123,24 +127,24 @@ export async function triggerKnowledgeBaseSyncServer(
  */
 export async function getKnowledgeBaseStatusServer(
   knowledgeBaseId: string,
-  resourcePath: string = "/"
+  resourcePath: string = "/",
 ): Promise<KBStatusResponse> {
   const token = await getAuthToken()
   const apiUrl = process.env.STACK_AI_API_URL!
-  
+
   const params = new URLSearchParams({ resource_path: resourcePath })
   const response = await fetch(
     `${apiUrl}/knowledge_bases/${knowledgeBaseId}/resources/children?${params}`,
     {
       headers: { Authorization: `Bearer ${token}` },
-    }
+    },
   )
-  
+
   if (!response.ok) {
     const error = await response.text()
     throw new Error(`Failed to get KB status: ${error}`)
   }
-  
+
   return response.json()
 }
 
@@ -149,20 +153,20 @@ export async function getKnowledgeBaseStatusServer(
  */
 export async function deleteFromKnowledgeBaseServer(
   knowledgeBaseId: string,
-  resourcePath: string
+  resourcePath: string,
 ): Promise<void> {
   const token = await getAuthToken()
   const apiUrl = process.env.STACK_AI_API_URL!
-  
+
   const params = new URLSearchParams({ resource_path: resourcePath })
   const response = await fetch(
     `${apiUrl}/knowledge_bases/${knowledgeBaseId}/resources?${params}`,
     {
       method: "DELETE",
       headers: { Authorization: `Bearer ${token}` },
-    }
+    },
   )
-  
+
   if (!response.ok) {
     const error = await response.text()
     throw new Error(`Failed to delete resource: ${error}`)
@@ -175,15 +179,15 @@ export async function deleteFromKnowledgeBaseServer(
 export async function listKnowledgeBasesServer(): Promise<KnowledgeBase[]> {
   const token = await getAuthToken()
   const apiUrl = process.env.STACK_AI_API_URL!
-  
+
   const response = await fetch(`${apiUrl}/knowledge_bases`, {
     headers: { Authorization: `Bearer ${token}` },
   })
-  
+
   if (!response.ok) {
     const error = await response.text()
     throw new Error(`Failed to list knowledge bases: ${error}`)
   }
-  
+
   return response.json()
 }
