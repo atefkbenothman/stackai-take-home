@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo, useCallback } from "react"
+import { useState, useMemo, useCallback, useEffect } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { FileTreeItem } from "@/components/file-tree/file-tree-item"
 import { FileTreeFooter } from "@/components/file-tree/file-tree-footer"
@@ -18,8 +18,17 @@ import {
 export function FileTree() {
   const [sortBy, setSortBy] = useState<SortOption>("name")
   const [searchQuery, setSearchQuery] = useState("")
+  const [debouncedSearch, setDebouncedSearch] = useState("")
   const [filterExtension, setFilterExtension] = useState("all")
+
   const queryClient = useQueryClient()
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchQuery)
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [searchQuery])
 
   const handleSortChange = useCallback((newSortBy: SortOption) => {
     setSortBy(newSortBy)
@@ -44,17 +53,20 @@ export function FileTree() {
   })
 
   const displayFiles = useMemo(() => {
-    if (searchQuery.trim()) {
-      // Search across all cached files, then apply filtering
-      const searchResults = searchCachedFiles(queryClient, searchQuery, sortBy)
+    if (debouncedSearch.trim()) {
+      const searchResults = searchCachedFiles(
+        queryClient,
+        debouncedSearch,
+        sortBy,
+      )
       return filterByExtension(searchResults, filterExtension)
     } else {
-      // Normal tree view - show sorted and filtered root files
+      // Normal tree view
       if (!filesData?.files) return []
       const filteredFiles = filterByExtension(filesData.files, filterExtension)
       return sortFiles(filteredFiles, sortBy)
     }
-  }, [filesData?.files, sortBy, searchQuery, filterExtension, queryClient])
+  }, [filesData?.files, sortBy, debouncedSearch, filterExtension, queryClient])
 
   if (isLoading) {
     return <FileTreeSkeleton />
@@ -72,10 +84,10 @@ export function FileTree() {
     <div className="rounded border bg-white shadow-sm">
       <FileTreeHeader
         sortBy={sortBy}
-        onSortChange={handleSortChange}
         searchQuery={searchQuery}
-        onSearchChange={handleSearchChange}
         filterExtension={filterExtension}
+        onSearchChange={handleSearchChange}
+        onSortChange={handleSortChange}
         onFilterChange={handleFilterChange}
       />
       <div className="h-[500px] overflow-y-auto">
@@ -88,7 +100,7 @@ export function FileTree() {
             <FileTreeItem
               key={file.resource_id}
               item={file}
-              level={searchQuery.trim() ? undefined : 0}
+              level={debouncedSearch.trim() ? undefined : 0}
               sortBy={sortBy}
               filterExtension={filterExtension}
             />

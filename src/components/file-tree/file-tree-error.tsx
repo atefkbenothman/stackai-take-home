@@ -8,10 +8,10 @@ export function FileTreeError() {
     <div className="rounded border bg-white shadow-sm">
       <FileTreeHeader
         sortBy="name"
-        onSortChange={() => {}}
         searchQuery=""
-        onSearchChange={() => {}}
         filterExtension="all"
+        onSortChange={() => {}}
+        onSearchChange={() => {}}
         onFilterChange={() => {}}
       />
       <div className="my-2 flex h-[500px] items-center justify-center overflow-y-auto">
