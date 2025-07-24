@@ -2,6 +2,7 @@ import type { Metadata } from "next"
 import { Geist, Geist_Mono } from "next/font/google"
 import Script from "next/script"
 import Providers from "@/app/providers"
+import { SelectionProvider } from "@/contexts/selection-context"
 import { Toaster } from "sonner"
 import "./globals.css"
 
@@ -37,7 +38,9 @@ export default function RootLayout({
             crossOrigin="anonymous"
           />
         )}
-        <Providers>{children}</Providers>
+        <Providers>
+          <SelectionProvider>{children}</SelectionProvider>
+        </Providers>
         <Toaster position="top-right" />
       </body>
     </html>

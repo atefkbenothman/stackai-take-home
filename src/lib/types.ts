@@ -18,3 +18,28 @@ export interface FilesResponse {
   connection_id: string
   org_id: string
 }
+
+// Selection-related types
+export interface SelectionState {
+  selectedIds: Set<string>
+  selectedItems: Map<string, FileItem>
+  folderSelectionIntent: Set<string> // Folders marked as "selected" but not expanded yet
+}
+
+export interface SelectionActions {
+  toggleSelection: (item: FileItem) => void
+  toggleFolderSelection: (folder: FileItem, children?: FileItem[]) => void
+  selectAll: (items: FileItem[]) => void
+  clearSelection: () => void
+  isSelected: (itemId: string) => boolean
+  isIndeterminate: (folderId: string, children?: FileItem[]) => boolean
+  getSelectedItems: () => FileItem[]
+  getSelectionSummary: () => {
+    count: number
+    totalSize: number
+  }
+}
+
+export interface SelectionContextType
+  extends SelectionState,
+    SelectionActions {}
