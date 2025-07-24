@@ -31,7 +31,7 @@ export default async function Home() {
           {rootData ? (
             <FileTree files={rootData.files} />
           ) : (
-            <FileTreeSkeleton count={8} />
+            <FileTreeSkeleton count={12} />
           )}
         </div>
       </div>
