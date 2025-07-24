@@ -1,19 +1,32 @@
 "use client"
 
 import React from "react"
-import { Plus, Minus, Folder, FolderOpen, File } from "lucide-react"
+import {
+  ChevronRight,
+  ChevronDown,
+  Folder,
+  FolderOpen,
+  File,
+  Clock,
+  Loader2,
+  CheckCircle,
+  XCircle,
+  Circle,
+} from "lucide-react"
 import type { FileItem } from "@/lib/types"
 import { FileTreeItemSkeleton } from "@/components/file-tree/file-tree-item-skeleton"
 import { useSelection } from "@/hooks/use-selection"
 import { Checkbox } from "@/components/ui/checkbox"
 import { useFolderOperations } from "@/hooks/use-folder-operations"
+import { formatDate, sortFiles, type SortOption } from "@/lib/utils"
 
 interface FileTreeItemProps {
   item: FileItem
   level?: number
+  sortBy: SortOption
 }
 
-export function FileTreeItem({ item, level = 0 }: FileTreeItemProps) {
+export function FileTreeItem({ item, level = 0, sortBy }: FileTreeItemProps) {
   const isFolder = item.inode_type === "directory"
 
   const {
@@ -52,8 +65,8 @@ export function FileTreeItem({ item, level = 0 }: FileTreeItemProps) {
           onCheckedChange={() => {
             if (isFolder && folderData?.files) {
               // Filter to only include direct children of this specific folder
-              const validChildren = folderData.files.filter((child) => 
-                child.parentId === item.resource_id
+              const validChildren = folderData.files.filter(
+                (child) => child.parentId === item.resource_id,
               )
               toggleFolderSelection(item, validChildren)
             } else {
@@ -67,9 +80,9 @@ export function FileTreeItem({ item, level = 0 }: FileTreeItemProps) {
         <div className="mr-2 flex h-4 w-4 items-center justify-center text-gray-500">
           {isFolder ? (
             isExpanded ? (
-              <Minus size={12} />
+              <ChevronDown size={12} />
             ) : (
-              <Plus size={12} />
+              <ChevronRight size={12} />
             )
           ) : null}
         </div>
@@ -94,7 +107,7 @@ export function FileTreeItem({ item, level = 0 }: FileTreeItemProps) {
         {item.indexingStatus && (
           <div className="ml-2 flex items-center">
             <span
-              className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${
+              className={`inline-flex items-center rounded-xs px-2 py-1 text-xs font-medium gap-1 ${
                 item.indexingStatus === "pending"
                   ? "bg-yellow-100 text-yellow-800"
                   : item.indexingStatus === "indexing"
@@ -106,11 +119,45 @@ export function FileTreeItem({ item, level = 0 }: FileTreeItemProps) {
                         : "bg-gray-100 text-gray-800"
               }`}
             >
-              {item.indexingStatus === "pending" && "⏳ Pending"}
-              {item.indexingStatus === "indexing" && "🔄 Indexing"}
-              {item.indexingStatus === "indexed" && "✅ Indexed"}
-              {item.indexingStatus === "error" && "❌ Error"}
-              {item.indexingStatus === "not-indexed" && "○ Not Indexed"}
+              {item.indexingStatus === "pending" && (
+                <>
+                  <Clock size={12} />
+                  Pending
+                </>
+              )}
+              {item.indexingStatus === "indexing" && (
+                <>
+                  <Loader2 size={12} className="animate-spin" />
+                  Indexing
+                </>
+              )}
+              {item.indexingStatus === "indexed" && (
+                <>
+                  <CheckCircle size={12} />
+                  Indexed
+                </>
+              )}
+              {item.indexingStatus === "error" && (
+                <>
+                  <XCircle size={12} />
+                  Error
+                </>
+              )}
+              {item.indexingStatus === "not-indexed" && (
+                <>
+                  <Circle size={12} />
+                  Not Indexed
+                </>
+              )}
+            </span>
+          </div>
+        )}
+
+        {/* Last modified date */}
+        {item.modified_at && (
+          <div className="ml-2 flex items-center">
+            <span className="font-mono text-[10px] whitespace-nowrap text-gray-400">
+              {formatDate(item.modified_at)}
             </span>
           </div>
         )}
@@ -125,11 +172,12 @@ export function FileTreeItem({ item, level = 0 }: FileTreeItemProps) {
           )}
           {!isLoading && !error && folderData?.files && (
             <div>
-              {folderData.files.map((childFile: FileItem) => (
+              {sortFiles(folderData.files, sortBy).map((childFile: FileItem) => (
                 <FileTreeItem
                   key={childFile.resource_id}
                   item={childFile}
                   level={level + 1}
+                  sortBy={sortBy}
                 />
               ))}
             </div>

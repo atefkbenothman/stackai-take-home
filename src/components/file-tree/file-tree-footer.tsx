@@ -18,7 +18,7 @@ export function FileTreeFooter({ allFiles = [] }: FileTreeFooterProps) {
     selectAll,
     getMinimalSelectedItems,
   } = useSelection()
-  const { indexFiles, isIndexing } = useIndexing()
+  const { indexFiles, isIndexing, isPolling } = useIndexing()
 
   const summary = getSelectionSummary()
 
@@ -57,20 +57,23 @@ export function FileTreeFooter({ allFiles = [] }: FileTreeFooterProps) {
           <>
             <Button
               onClick={handleIndexFiles}
-              disabled={isIndexing}
+              disabled={isIndexing || isPolling}
               size="sm"
-              className="h-6 rounded-xs px-2 text-xs hover:cursor-pointer"
+              className="h-6 rounded-xs bg-blue-500 px-2 text-xs text-white hover:cursor-pointer hover:bg-blue-600"
             >
-              {isIndexing ? "Indexing..." : "Index Selected Files"}
+              {isIndexing
+                ? "Creating KB..."
+                : isPolling
+                  ? "Monitoring..."
+                  : "Index"}
             </Button>
 
             <Button
               onClick={clearSelection}
-              variant="secondary"
+              variant="outline"
               size="sm"
               className="h-6 rounded-xs px-2 text-xs hover:cursor-pointer"
             >
-              <X size={12} className="mr-1" />
               Clear
             </Button>
           </>
