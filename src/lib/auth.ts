@@ -67,25 +67,21 @@ export async function getAuthToken(): Promise<AuthResult> {
 
   // Cache token in HTTP-only cookies for security
   // Skip cookie setting in RSC context to avoid "Cookies can only be modified" error
-  try {
-    const expiresAt = Date.now() + data.expires_in * 1000
+  const expiresAt = Date.now() + data.expires_in * 1000
 
-    cookieStore.set("stack_ai_token", data.access_token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      maxAge: data.expires_in,
-    })
+  cookieStore.set("stack_ai_token", data.access_token, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    maxAge: data.expires_in,
+  })
 
-    cookieStore.set("stack_ai_expires", expiresAt.toString(), {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      maxAge: data.expires_in,
-    })
-  } catch {
-    console.log("Cookie setting skipped in RSC context")
-  }
+  cookieStore.set("stack_ai_expires", expiresAt.toString(), {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    maxAge: data.expires_in,
+  })
 
   return {
     token: data.access_token,

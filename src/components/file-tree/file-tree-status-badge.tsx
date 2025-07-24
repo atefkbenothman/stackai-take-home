@@ -1,6 +1,7 @@
 "use client"
 
-import { Clock, Loader2, CheckCircle, XCircle, Circle } from "lucide-react"
+import { Clock, Loader2, CheckCircle, XCircle, Circle, X } from "lucide-react"
+import type { FileItem } from "@/lib/types"
 
 const STATUS_CONFIG = {
   pending: {
@@ -31,11 +32,39 @@ const STATUS_CONFIG = {
   },
 } as const
 
-export function StatusBadge({ status }: { status: string }) {
+interface StatusBadgeProps {
+  status: string
+  file?: FileItem
+  onDeindex?: (file: FileItem) => void
+}
+
+export function StatusBadge({ status, file, onDeindex }: StatusBadgeProps) {
   const config =
     STATUS_CONFIG[status as keyof typeof STATUS_CONFIG] ||
     STATUS_CONFIG["not-indexed"]
   const Icon = config.icon
+
+  const canDeindex = status === "indexed" && file?.kbResourceId && onDeindex
+
+  if (canDeindex) {
+    return (
+      <span
+        className={`group inline-flex items-center gap-1 rounded-xs px-2 py-1 text-xs font-medium cursor-pointer hover:bg-red-100 hover:text-red-800 transition-colors ${config.className}`}
+        onClick={(e) => {
+          e.stopPropagation()
+          onDeindex(file)
+        }}
+        title="Click to remove from index"
+      >
+        <Icon
+          size={12}
+          className={"iconClassName" in config ? config.iconClassName : ""}
+        />
+        {config.text}
+        <X size={10} className="opacity-0 group-hover:opacity-100 transition-opacity" />
+      </span>
+    )
+  }
 
   return (
     <span

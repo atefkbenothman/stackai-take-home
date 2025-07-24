@@ -46,29 +46,6 @@ export interface FilesResponse {
   org_id: string
 }
 
-export interface SelectionState {
-  selectedItems: Map<string, FileItem>
-}
-
-export interface SelectionActions {
-  toggleSelection: (item: FileItem) => void
-  toggleFolderSelection: (folder: FileItem, children?: FileItem[]) => void
-  selectAll: (items: FileItem[]) => void
-  clearSelection: () => void
-  isSelected: (itemId: string) => boolean
-  isIndeterminate: (folder: FileItem, children?: FileItem[]) => boolean
-  getSelectedItems: () => FileItem[]
-  getMinimalSelectedItems: () => FileItem[]
-  getSelectionSummary: () => {
-    count: number
-    totalSize: number
-  }
-}
-
-export interface SelectionContextType
-  extends SelectionState,
-    SelectionActions {}
-
 export interface KnowledgeBase {
   knowledge_base_id: string
   name: string
@@ -113,4 +90,3 @@ export interface KBResource {
 export interface KBStatusResponse {
   data: KBResource[]
 }
-

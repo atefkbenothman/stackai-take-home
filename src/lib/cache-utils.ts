@@ -28,6 +28,7 @@ export function updateFileIndexingStatus(
   resourceId: string,
   status: IndexingStatus,
   error?: string,
+  knowledgeBaseId?: string,
 ) {
   // Update root files cache
   queryClient.setQueryData(["files"], (oldData: FilesResponse | undefined) => {
@@ -41,6 +42,12 @@ export function updateFileIndexingStatus(
               ...file,
               indexingStatus: status,
               indexingError: error,
+              kbResourceId:
+                status === "indexed" && knowledgeBaseId
+                  ? knowledgeBaseId
+                  : status === "not-indexed"
+                    ? undefined
+                    : file.kbResourceId,
               lastIndexedAt:
                 status === "indexed"
                   ? new Date().toISOString()
@@ -68,6 +75,12 @@ export function updateFileIndexingStatus(
                     ...file,
                     indexingStatus: status,
                     indexingError: error,
+                    kbResourceId:
+                      status === "indexed" && knowledgeBaseId
+                        ? knowledgeBaseId
+                        : status === "not-indexed"
+                          ? undefined
+                          : file.kbResourceId,
                     lastIndexedAt:
                       status === "indexed"
                         ? new Date().toISOString()

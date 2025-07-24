@@ -3,58 +3,62 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { useState, useEffect } from "react"
 import { toast } from "sonner"
-import { generateKnowledgeBaseName } from "@/lib/utils"
 import {
   updateFileIndexingStatus,
   mapKBStatusToIndexingStatus,
 } from "@/lib/cache-utils"
 import {
   createKnowledgeBase,
+  fetchFiles,
   triggerKnowledgeBaseSync,
   getKnowledgeBaseStatus,
-  fetchFiles,
+  deleteFromKnowledgeBase,
 } from "@/lib/stack-ai-client"
 import type { FileItem, KBResource } from "@/lib/types"
 
 interface UseFileIndexingReturn {
   indexFiles: (selectedItems: FileItem[]) => void
+  deindexFile: (file: FileItem) => void
   isIndexing: boolean
   isPolling: boolean
   isActive: boolean
 }
 
 async function indexFilesAPI(selectedItems: FileItem[]) {
-  // Get connection info from the files API
+  // Get connection info (like notebook step 1.1)
   const filesData = await fetchFiles()
   const connectionId = filesData.connection_id
 
   if (!connectionId) {
-    throw new Error("Could not determine connection ID")
+    throw new Error("Could not determine connection ID for KB creation")
   }
 
-  // Extract resource IDs and names for KB creation
+  // Extract resource IDs (like notebook section 2)
   const selectedResourceIds = selectedItems.map((item) => item.resource_id)
-  const selectedFileNames = selectedItems.map((item) => {
-    const pathParts = item.inode_path.path.split("/")
-    return pathParts[pathParts.length - 1] || item.inode_path.path
-  })
 
-  // Generate KB name and description
-  const kbName = generateKnowledgeBaseName(selectedFileNames)
-  const kbDescription = `Knowledge Base created from ${selectedItems.length} selected file${selectedItems.length !== 1 ? "s" : ""}: ${selectedFileNames.slice(0, 3).join(", ")}${selectedFileNames.length > 3 ? ` and ${selectedFileNames.length - 3} more` : ""}`
-
-  // Create the Knowledge Base
-  const kb = await createKnowledgeBase(
+  // Create KB with files included (like notebook section 2.1)
+  const newKb = await createKnowledgeBase(
     connectionId,
-    selectedResourceIds,
-    kbName,
-    kbDescription,
+    selectedResourceIds, // Include files in creation
+    `File Picker KB - ${new Date().toISOString()}`,
+    "Knowledge Base created via file picker"
   )
 
-  // Trigger sync/indexing
-  await triggerKnowledgeBaseSync(kb.knowledge_base_id)
+  // Trigger sync (like notebook section 2.2)
+  await triggerKnowledgeBaseSync(newKb.knowledge_base_id)
 
-  return { kb, selectedItems, kbName }
+  return { knowledgeBaseId: newKb.knowledge_base_id, selectedItems }
+}
+
+async function deindexFileAPI(file: FileItem) {
+  if (!file.kbResourceId) {
+    throw new Error("File is not indexed - missing Knowledge Base ID")
+  }
+
+  // Use the resource path for deletion as per the Jupyter notebook
+  await deleteFromKnowledgeBase(file.kbResourceId, file.inode_path.path)
+
+  return { file }
 }
 
 export function useFileIndexing(): UseFileIndexingReturn {
@@ -65,7 +69,7 @@ export function useFileIndexing(): UseFileIndexingReturn {
     startTime: number
   } | null>(null)
 
-  // Knowledge Base creation mutation
+  // Knowledge Base indexing mutation following notebook pattern
   const mutation = useMutation({
     mutationFn: indexFilesAPI,
     onMutate: async (selectedItems: FileItem[]) => {
@@ -85,26 +89,32 @@ export function useFileIndexing(): UseFileIndexingReturn {
         updateFileIndexingStatus(queryClient, item.resource_id, "pending")
       })
 
-      toast.info("Starting indexing process...")
+      toast.info("Creating Knowledge Base and indexing files...")
       return { selectedItems }
     },
     onSuccess: (data) => {
-      const { kb, selectedItems, kbName } = data
+      const { knowledgeBaseId, selectedItems } = data
 
       // Immediately set files to "indexing" status since KB creation succeeded
       selectedItems.forEach((item) => {
-        updateFileIndexingStatus(queryClient, item.resource_id, "indexing")
+        updateFileIndexingStatus(
+          queryClient,
+          item.resource_id,
+          "indexing",
+          undefined,
+          knowledgeBaseId,
+        )
       })
 
       // Start status polling
       setActiveIndexing({
-        knowledgeBaseId: kb.knowledge_base_id,
+        knowledgeBaseId,
         selectedFiles: selectedItems,
         startTime: Date.now(),
       })
 
       toast.success(
-        `Successfully started indexing ${selectedItems.length} file${selectedItems.length !== 1 ? "s" : ""} into "${kbName}"`,
+        `Successfully created Knowledge Base and started indexing ${selectedItems.length} file${selectedItems.length !== 1 ? "s" : ""}`,
       )
     },
     onError: (error, selectedItems) => {
@@ -164,7 +174,13 @@ export function useFileIndexing(): UseFileIndexingReturn {
 
       if (kbResource?.status) {
         const indexingStatus = mapKBStatusToIndexingStatus(kbResource.status)
-        updateFileIndexingStatus(queryClient, file.resource_id, indexingStatus)
+        updateFileIndexingStatus(
+          queryClient,
+          file.resource_id,
+          indexingStatus,
+          undefined,
+          activeIndexing.knowledgeBaseId,
+        )
       }
     })
   }, [kbStatusData, activeIndexing, queryClient])
@@ -219,12 +235,52 @@ export function useFileIndexing(): UseFileIndexingReturn {
     return () => clearTimeout(timeoutId)
   }, [activeIndexing])
 
+  // De-indexing mutation for individual files
+  const deindexMutation = useMutation({
+    mutationFn: deindexFileAPI,
+    onMutate: async (file: FileItem) => {
+      // Optimistically update file to "not-indexed" status
+      updateFileIndexingStatus(
+        queryClient,
+        file.resource_id,
+        "not-indexed",
+        undefined,
+        undefined, // Clear the KB ID
+      )
+
+      toast.info(`Removing "${file.inode_path.path}" from index...`)
+      return { file }
+    },
+    onSuccess: (data) => {
+      const { file } = data
+      toast.success(`Successfully removed "${file.inode_path.path}" from index`)
+      
+      // File status should already be "not-indexed" from optimistic update
+      // No need to update again
+    },
+    onError: (error, file) => {
+      // Rollback optimistic update - restore the indexed status
+      updateFileIndexingStatus(
+        queryClient,
+        file.resource_id,
+        "indexed",
+        undefined,
+        file.kbResourceId, // Restore the KB ID
+      )
+
+      toast.error(
+        `Failed to remove "${file.inode_path.path}" from index: ${error instanceof Error ? error.message : "Unknown error"}`,
+      )
+    },
+  })
+
   const isIndexing = mutation.isPending
   const isPolling = isPollingQuery && !!activeIndexing
   const isActive = isIndexing || isPolling
 
   return {
     indexFiles: mutation.mutate,
+    deindexFile: deindexMutation.mutate,
     isIndexing,
     isPolling,
     isActive,

@@ -67,10 +67,6 @@ export function FileTree() {
     }
   }, [filesData?.files, sortBy, debouncedSearch, filterExtension, queryClient])
 
-  const stableAllFiles = useMemo(() => {
-    return filesData?.files || []
-  }, [filesData?.files])
-
   if (isLoading) {
     return <FileTreeSkeleton />
   }
@@ -110,7 +106,7 @@ export function FileTree() {
           ))
         )}
       </div>
-      <FileTreeFooter allFiles={stableAllFiles} />
+      <FileTreeFooter allFiles={filesData?.files || []} />
     </div>
   )
 }

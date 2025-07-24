@@ -248,6 +248,7 @@ class StackAIClient {
 
     return response.json()
   }
+
 }
 
 // Export singleton instance
@@ -311,3 +312,4 @@ export async function deleteFromKnowledgeBase(
 export async function listKnowledgeBases(): Promise<KnowledgeBase[]> {
   return stackAIClient.listKnowledgeBases()
 }
+
