@@ -92,7 +92,7 @@ export function FileTreeItem({ item, level = 0 }: FileTreeItemProps) {
       {isFolder && isExpanded && (
         <div className="animate-in slide-in-from-left-1 duration-150">
           {isLoading && (
-            <div className="h-8 border-b">
+            <div className="border-b">
               <FileSkeleton level={level + 1} />
             </div>
           )}

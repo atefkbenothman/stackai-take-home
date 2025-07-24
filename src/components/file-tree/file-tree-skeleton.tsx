@@ -8,8 +8,8 @@ export function FileTreeSkeleton() {
         <h2 className="text-sm font-semibold text-gray-700">File Picker</h2>
       </div>
       <div className="h-[500px] w-full overflow-y-auto">
-        {Array.from({ length: 12 }).map((_, index) => (
-          <div className="h-8 border-b" key={index}>
+        {Array.from({ length: 13 }).map((_, index) => (
+          <div className="border-b" key={index}>
             <div className="-mx-10 flex items-center">
               <FileSkeleton level={0} />
             </div>
