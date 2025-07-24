@@ -18,15 +18,26 @@ import { FileTreeItemSkeleton } from "@/components/file-tree/file-tree-item-skel
 import { useSelection } from "@/hooks/use-selection"
 import { Checkbox } from "@/components/ui/checkbox"
 import { useFolderOperations } from "@/hooks/use-folder-operations"
-import { formatDate, sortFiles, type SortOption } from "@/lib/utils"
+import {
+  formatDate,
+  sortFiles,
+  filterByExtension,
+  type SortOption,
+} from "@/lib/utils"
 
 interface FileTreeItemProps {
   item: FileItem
   level?: number
   sortBy: SortOption
+  filterExtension?: string
 }
 
-export function FileTreeItem({ item, level = 0, sortBy }: FileTreeItemProps) {
+export function FileTreeItem({
+  item,
+  level = 0,
+  sortBy,
+  filterExtension = "all",
+}: FileTreeItemProps) {
   const isFolder = item.inode_type === "directory"
 
   const {
@@ -107,7 +118,7 @@ export function FileTreeItem({ item, level = 0, sortBy }: FileTreeItemProps) {
         {item.indexingStatus && (
           <div className="ml-2 flex items-center">
             <span
-              className={`inline-flex items-center rounded-xs px-2 py-1 text-xs font-medium gap-1 ${
+              className={`inline-flex items-center gap-1 rounded-xs px-2 py-1 text-xs font-medium ${
                 item.indexingStatus === "pending"
                   ? "bg-yellow-100 text-yellow-800"
                   : item.indexingStatus === "indexing"
@@ -172,12 +183,16 @@ export function FileTreeItem({ item, level = 0, sortBy }: FileTreeItemProps) {
           )}
           {!isLoading && !error && folderData?.files && (
             <div>
-              {sortFiles(folderData.files, sortBy).map((childFile: FileItem) => (
+              {sortFiles(
+                filterByExtension(folderData.files, filterExtension),
+                sortBy,
+              ).map((childFile: FileItem) => (
                 <FileTreeItem
                   key={childFile.resource_id}
                   item={childFile}
                   level={level + 1}
                   sortBy={sortBy}
+                  filterExtension={filterExtension}
                 />
               ))}
             </div>

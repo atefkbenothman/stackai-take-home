@@ -1,18 +1,38 @@
 "use client"
 
-import { useState, useMemo } from "react"
-import { useQuery } from "@tanstack/react-query"
+import { useState, useMemo, useCallback } from "react"
+import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { FileTreeItem } from "@/components/file-tree/file-tree-item"
 import { FileTreeFooter } from "@/components/file-tree/file-tree-footer"
 import { FileTreeHeader } from "@/components/file-tree/file-tree-header"
 import { FileTreeSkeleton } from "@/components/file-tree/file-tree-skeleton"
 import { FileTreeError } from "@/components/file-tree/file-tree-error"
 import { getFiles } from "@/lib/api/files"
-import { sortFiles, type SortOption } from "@/lib/utils"
+import {
+  sortFiles,
+  searchCachedFiles,
+  filterByExtension,
+  type SortOption,
+} from "@/lib/utils"
 
 export function FileTree() {
-  const [sortBy, setSortBy] = useState<SortOption>('name')
-  
+  const [sortBy, setSortBy] = useState<SortOption>("name")
+  const [searchQuery, setSearchQuery] = useState("")
+  const [filterExtension, setFilterExtension] = useState("all")
+  const queryClient = useQueryClient()
+
+  const handleSortChange = useCallback((newSortBy: SortOption) => {
+    setSortBy(newSortBy)
+  }, [])
+
+  const handleSearchChange = useCallback((newSearchQuery: string) => {
+    setSearchQuery(newSearchQuery)
+  }, [])
+
+  const handleFilterChange = useCallback((newFilter: string) => {
+    setFilterExtension(newFilter)
+  }, [])
+
   const {
     data: filesData,
     isLoading,
@@ -23,10 +43,18 @@ export function FileTree() {
     staleTime: 5 * 60 * 1000, // 5 minutes
   })
 
-  const sortedFiles = useMemo(() => {
-    if (!filesData?.files) return []
-    return sortFiles(filesData.files, sortBy)
-  }, [filesData?.files, sortBy])
+  const displayFiles = useMemo(() => {
+    if (searchQuery.trim()) {
+      // Search across all cached files, then apply filtering
+      const searchResults = searchCachedFiles(queryClient, searchQuery, sortBy)
+      return filterByExtension(searchResults, filterExtension)
+    } else {
+      // Normal tree view - show sorted and filtered root files
+      if (!filesData?.files) return []
+      const filteredFiles = filterByExtension(filesData.files, filterExtension)
+      return sortFiles(filteredFiles, sortBy)
+    }
+  }, [filesData?.files, sortBy, searchQuery, filterExtension, queryClient])
 
   if (isLoading) {
     return <FileTreeSkeleton />
@@ -42,13 +70,32 @@ export function FileTree() {
 
   return (
     <div className="rounded border bg-white shadow-sm">
-      <FileTreeHeader sortBy={sortBy} onSortChange={setSortBy} />
+      <FileTreeHeader
+        sortBy={sortBy}
+        onSortChange={handleSortChange}
+        searchQuery={searchQuery}
+        onSearchChange={handleSearchChange}
+        filterExtension={filterExtension}
+        onFilterChange={handleFilterChange}
+      />
       <div className="h-[500px] overflow-y-auto">
-        {sortedFiles.map((file) => (
-          <FileTreeItem key={file.resource_id} item={file} level={0} sortBy={sortBy} />
-        ))}
+        {displayFiles.length === 0 && searchQuery.trim() ? (
+          <div className="flex h-full items-center justify-center text-sm text-gray-500">
+            No files match your search
+          </div>
+        ) : (
+          displayFiles.map((file) => (
+            <FileTreeItem
+              key={file.resource_id}
+              item={file}
+              level={searchQuery.trim() ? undefined : 0}
+              sortBy={sortBy}
+              filterExtension={filterExtension}
+            />
+          ))
+        )}
       </div>
-      <FileTreeFooter allFiles={filesData.files} />
+      <FileTreeFooter allFiles={filesData?.files || []} />
     </div>
   )
 }
