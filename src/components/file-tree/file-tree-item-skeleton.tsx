@@ -1,12 +1,12 @@
-interface FileSkeletonProps {
+interface FileTreeItemSkeletonProps {
   level?: number
 }
 
-export function FileSkeleton({ level = 0 }: FileSkeletonProps) {
+export function FileTreeItemSkeleton({ level = 0 }: FileTreeItemSkeletonProps) {
   return (
     <div
       className="flex animate-pulse items-center px-2 py-1"
-      style={{ paddingLeft: `${level * 20 + 8}px` }}
+      style={{ paddingLeft: `${level * 26 + 8}px` }}
     >
       <div className="mr-2 h-4 w-4" />
       <div className="mr-2 h-4 w-4" />

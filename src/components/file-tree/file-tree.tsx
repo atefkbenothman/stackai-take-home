@@ -1,7 +1,8 @@
 "use client"
 
 import { FileTreeItem } from "@/components/file-tree/file-tree-item"
-import { SelectionSummary } from "@/components/file-tree/selection-summary"
+import { FileTreeFooter } from "@/components/file-tree/file-tree-footer"
+import { FileTreeHeader } from "@/components/file-tree/file-tree-header"
 import type { FileItem } from "@/lib/types"
 
 interface FileTreeProps {
@@ -11,17 +12,13 @@ interface FileTreeProps {
 export function FileTree({ files }: FileTreeProps) {
   return (
     <div className="rounded border bg-white shadow-sm">
-      <div className="flex h-10 items-center border-b bg-gray-200 p-2">
-        <h2 className="text-sm font-semibold text-gray-700">File Picker</h2>
-      </div>
+      <FileTreeHeader />
       <div className="h-[500px] overflow-y-auto">
-        <>
-          {files.map((file) => (
-            <FileTreeItem key={file.resource_id} item={file} level={0} />
-          ))}
-        </>
+        {files.map((file) => (
+          <FileTreeItem key={file.resource_id} item={file} level={0} />
+        ))}
       </div>
-      <SelectionSummary allFiles={files} />
+      <FileTreeFooter allFiles={files} />
     </div>
   )
 }

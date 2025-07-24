@@ -3,7 +3,7 @@
 import React from "react"
 import { Plus, Minus, Folder, FolderOpen, File } from "lucide-react"
 import type { FileItem } from "@/lib/types"
-import { FileSkeleton } from "@/components/file-tree/file-skeleton"
+import { FileTreeItemSkeleton } from "@/components/file-tree/file-tree-item-skeleton"
 import { useSelection } from "@/hooks/use-selection"
 import { Checkbox } from "@/components/ui/checkbox"
 import { useFolderOperations } from "@/hooks/use-folder-operations"
@@ -41,9 +41,9 @@ export function FileTreeItem({ item, level = 0 }: FileTreeItemProps) {
     <div>
       <div
         className={`flex cursor-pointer items-center border-b px-2 py-1 transition-colors hover:bg-gray-50 ${
-          itemIsSelected ? "bg-blue-50" : ""
+          itemIsSelected ? "bg-blue-100" : ""
         }`}
-        style={{ paddingLeft: `${level * 20 + 8}px` }}
+        style={{ paddingLeft: `${level * 26 + 8}px` }}
         onClick={toggleExpansion}
         onMouseEnter={prefetch}
       >
@@ -72,11 +72,9 @@ export function FileTreeItem({ item, level = 0 }: FileTreeItemProps) {
 
         <div className="mr-2 flex h-5 w-5 items-center justify-center text-gray-600">
           {isFolder ? (
-            isExpanded ? (
-              <FolderOpen size={16} />
-            ) : (
-              <Folder size={16} />
-            )
+            <div className="text-blue-600">
+              {isExpanded ? <FolderOpen size={16} /> : <Folder size={16} />}
+            </div>
           ) : (
             <File size={16} />
           )}
@@ -93,7 +91,7 @@ export function FileTreeItem({ item, level = 0 }: FileTreeItemProps) {
         <div className="animate-in slide-in-from-left-1 duration-150">
           {isLoading && (
             <div className="border-b">
-              <FileSkeleton level={level + 1} />
+              <FileTreeItemSkeleton level={level + 1} />
             </div>
           )}
           {!isLoading && !error && folderData?.files && (

@@ -7,7 +7,7 @@ import {
 import { FileTree } from "@/components/file-tree/file-tree"
 import { FileTreeSkeleton } from "@/components/file-tree/file-tree-skeleton"
 import { getFilesServer } from "@/lib/api/files-server"
-import { FileError } from "@/components/file-tree/file-error"
+import { FileTreeError } from "@/components/file-tree/file-tree-error"
 
 async function FileTreeData() {
   const queryClient = new QueryClient()
@@ -27,7 +27,7 @@ async function FileTreeData() {
       </HydrationBoundary>
     )
   } catch {
-    return <FileError />
+    return <FileTreeError />
   }
 }
 

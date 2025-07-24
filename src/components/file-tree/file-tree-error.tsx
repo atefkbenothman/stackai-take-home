@@ -1,11 +1,10 @@
 import { AlertCircle } from "lucide-react"
+import { FileTreeHeader } from "@/components/file-tree/file-tree-header"
 
-export function FileError() {
+export function FileTreeError() {
   return (
     <div className="rounded border bg-white shadow-sm">
-      <div className="flex h-10 items-center border-b bg-gray-200 p-2">
-        <h2 className="text-sm font-semibold text-gray-700">File Picker</h2>
-      </div>
+      <FileTreeHeader />
       <div className="my-2 flex h-[500px] items-center justify-center overflow-y-auto">
         <div className="flex flex-col items-center justify-center space-y-4 p-8 text-center">
           <AlertCircle className="h-8 w-8 text-red-500" />
