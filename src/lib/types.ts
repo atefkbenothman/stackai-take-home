@@ -32,8 +32,9 @@ export interface SelectionActions {
   selectAll: (items: FileItem[]) => void
   clearSelection: () => void
   isSelected: (itemId: string) => boolean
-  isIndeterminate: (folderId: string, children?: FileItem[]) => boolean
+  isIndeterminate: (folder: FileItem, children?: FileItem[]) => boolean
   getSelectedItems: () => FileItem[]
+  getMinimalSelectedItems: () => FileItem[]
   getSelectionSummary: () => {
     count: number
     totalSize: number

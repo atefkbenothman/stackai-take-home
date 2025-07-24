@@ -1,13 +1,12 @@
 import { useState, useCallback, useEffect } from "react"
 import { toast } from "sonner"
-import type { FileItem, FilesResponse } from "@/lib/types"
+import type { FilesResponse } from "@/lib/types"
 import { useFolderData } from "@/hooks/use-folder-data"
 
 interface UseFolderExpansionOptions {
   folderId: string
   isFolder: boolean
   folderName: string
-  onSelectionIntent?: (children: FileItem[]) => void
 }
 
 interface UseFolderExpansionReturn {
@@ -23,7 +22,6 @@ export function useFolderExpansion({
   folderId,
   isFolder,
   folderName,
-  onSelectionIntent,
 }: UseFolderExpansionOptions): UseFolderExpansionReturn {
   const { fetchFolder, getCachedFolder } = useFolderData()
   
@@ -40,8 +38,6 @@ export function useFolderExpansion({
       setFolderData(cachedData)
       setIsLoading(false)
       setError(null)
-      // Handle selection intent for lazy-loaded folders
-      onSelectionIntent?.(cachedData.files)
       return
     }
 
@@ -52,15 +48,13 @@ export function useFolderExpansion({
     try {
       const data = await fetchFolder(targetFolderId)
       setFolderData(data)
-      // Handle selection intent for lazy-loaded folders
-      onSelectionIntent?.(data.files)
     } catch (err) {
       const errorObj = err instanceof Error ? err : new Error("Unknown error occurred")
       setError(errorObj)
     } finally {
       setIsLoading(false)
     }
-  }, [fetchFolder, getCachedFolder, onSelectionIntent])
+  }, [fetchFolder, getCachedFolder])
 
   const handleToggle = useCallback(() => {
     if (!isFolder) return

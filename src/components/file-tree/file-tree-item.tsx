@@ -24,24 +24,11 @@ export function FileTreeItem({ item, level = 0 }: FileTreeItemProps) {
     isIndeterminate,
   } = useSelection()
 
-  // Auto-select children if this folder was marked for selection intent
-  const handleSelectionIntent = (children: FileItem[]) => {
-    if (isSelected(item.resource_id)) {
-      // This folder is selected, so auto-select all its children
-      children.forEach((child) => {
-        if (!isSelected(child.resource_id)) {
-          toggleSelection(child)
-        }
-      })
-    }
-  }
-
   const { isExpanded, folderData, isLoading, error, handleToggle } =
     useFolderExpansion({
       folderId: item.resource_id,
       isFolder,
       folderName: item.inode_path.path,
-      onSelectionIntent: handleSelectionIntent,
     })
 
   const { handleMouseEnter } = useFolderPrefetch({
@@ -52,7 +39,7 @@ export function FileTreeItem({ item, level = 0 }: FileTreeItemProps) {
 
   const itemIsSelected = isSelected(item.resource_id)
   const itemIsIndeterminate = isFolder
-    ? isIndeterminate(item.resource_id, folderData?.files || [])
+    ? isIndeterminate(item, folderData?.files || [])
     : false
 
   return (
@@ -100,7 +87,7 @@ export function FileTreeItem({ item, level = 0 }: FileTreeItemProps) {
           )}
         </div>
 
-        <div className="flex-1 overflow-x-auto min-w-0">
+        <div className="min-w-0 flex-1 overflow-x-auto">
           <span className="font-mono text-sm whitespace-nowrap">
             {item.inode_path.path}
           </span>
