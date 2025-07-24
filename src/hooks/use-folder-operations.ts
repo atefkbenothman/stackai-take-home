@@ -42,15 +42,11 @@ export function useFolderOperations(item: FileItem): UseFolderOperationsReturn {
   // Prefetch folder data on hover
   const prefetch = useCallback(() => {
     if (!isFolder || isExpanded) return
-    queryClient
-      .prefetchQuery({
-        queryKey: ["files", item.resource_id],
-        queryFn: () => fetchFiles(item.resource_id),
-        staleTime: 5 * 60 * 1000,
-      })
-      .catch((error) => {
-        console.debug("Prefetch failed for folder:", item.resource_id, error)
-      })
+    queryClient.prefetchQuery({
+      queryKey: ["files", item.resource_id],
+      queryFn: () => fetchFiles(item.resource_id),
+      staleTime: 5 * 60 * 1000,
+    })
   }, [isFolder, isExpanded, queryClient, item.resource_id])
 
   // Show toast notification for errors

@@ -1,5 +1,6 @@
 "use client"
 
+import { memo, useCallback, useMemo, useState, useEffect } from "react"
 import {
   ChevronRight,
   ChevronDown,
@@ -11,7 +12,7 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { FileTreeItemSkeleton } from "@/components/file-tree/file-tree-item-skeleton"
 import { StatusBadge } from "@/components/file-tree/file-tree-status-badge"
 import { useFolderOperations } from "@/hooks/use-folder-operations"
-import { useSelection } from "@/hooks/use-selection"
+import { useSelectionStore } from "@/stores/selection-store"
 import type { FileItem } from "@/lib/types"
 import {
   formatDate,
@@ -27,7 +28,7 @@ interface FileTreeItemProps {
   filterExtension?: string
 }
 
-export function FileTreeItem({
+function FileTreeItemComponent({
   item,
   level = 0,
   sortBy,
@@ -35,12 +36,30 @@ export function FileTreeItem({
 }: FileTreeItemProps) {
   const isFolder = item.inode_type === "directory"
 
-  const {
-    isSelected,
-    toggleSelection,
-    toggleFolderSelection,
-    isIndeterminate,
-  } = useSelection()
+  // Use manual subscription for THIS item only
+  const [isSelected, setIsSelected] = useState(() =>
+    useSelectionStore.getState().selectedItems.has(item.resource_id),
+  )
+
+  // Subscribe only to changes that affect THIS specific item
+  useEffect(() => {
+    const unsubscribe = useSelectionStore.subscribe((state, prevState) => {
+      const wasSelected = prevState.selectedItems.has(item.resource_id)
+      const isNowSelected = state.selectedItems.has(item.resource_id)
+
+      if (wasSelected !== isNowSelected) {
+        setIsSelected(isNowSelected)
+      }
+    })
+
+    return unsubscribe
+  }, [item.resource_id])
+
+  // Get actions from store (these are stable)
+  const toggleSelection = useSelectionStore((state) => state.toggleSelection)
+  const toggleFolderSelection = useSelectionStore(
+    (state) => state.toggleFolderSelection,
+  )
 
   const {
     isExpanded,
@@ -51,34 +70,76 @@ export function FileTreeItem({
     prefetch,
   } = useFolderOperations(item)
 
-  const itemIsSelected = isSelected(item.resource_id)
-  const itemIsIndeterminate = isFolder
-    ? isIndeterminate(item, folderData?.files || [])
-    : false
+  const itemIsIndeterminate = useMemo(() => {
+    if (!isFolder || isSelected) return false
+
+    const children = folderData?.files || []
+    const validChildren = children.filter(
+      (child) => child.parentId === item.resource_id,
+    )
+
+    const selectedItems = useSelectionStore.getState().selectedItems
+
+    const hasSelectedDescendants = Array.from(selectedItems.values()).some(
+      (selectedItem) => {
+        if (selectedItem.resource_id === item.resource_id) return false
+        if (selectedItem.parentId === item.resource_id) return true
+
+        let currentItem = selectedItem
+        while (currentItem.parentId) {
+          const parent = Array.from(selectedItems.values()).find(
+            (p) => p.resource_id === currentItem.parentId,
+          )
+          if (!parent) break
+          if (parent.resource_id === item.resource_id) return true
+          currentItem = parent
+        }
+        return false
+      },
+    )
+
+    if (!hasSelectedDescendants) return false
+
+    if (validChildren.length > 0) {
+      const allDirectChildrenSelected = validChildren.every((child) =>
+        selectedItems.has(child.resource_id),
+      )
+      return !allDirectChildrenSelected
+    }
+
+    return true
+  }, [isFolder, isSelected, item.resource_id, folderData?.files])
+
+  const handleCheckboxChange = useCallback(() => {
+    if (isFolder && folderData?.files) {
+      const validChildren = folderData.files.filter(
+        (child) => child.parentId === item.resource_id,
+      )
+      toggleFolderSelection(item, validChildren)
+    } else {
+      toggleSelection(item)
+    }
+  }, [
+    isFolder,
+    folderData?.files,
+    item,
+    toggleFolderSelection,
+    toggleSelection,
+  ])
 
   return (
     <div>
       <div
         className={`flex cursor-pointer items-center border-b px-2 py-1 transition-colors hover:bg-gray-50 ${
-          itemIsSelected ? "bg-blue-100" : ""
+          isSelected ? "bg-blue-100" : ""
         }`}
         style={{ paddingLeft: `${level * 26 + 8}px` }}
         onClick={toggleExpansion}
         onMouseEnter={prefetch}
       >
         <Checkbox
-          checked={itemIsIndeterminate ? "indeterminate" : itemIsSelected}
-          onCheckedChange={() => {
-            if (isFolder && folderData?.files) {
-              // Filter to only include direct children of this specific folder
-              const validChildren = folderData.files.filter(
-                (child) => child.parentId === item.resource_id,
-              )
-              toggleFolderSelection(item, validChildren)
-            } else {
-              toggleSelection(item)
-            }
-          }}
+          checked={itemIsIndeterminate ? "indeterminate" : isSelected}
+          onCheckedChange={handleCheckboxChange}
           onClick={(e) => e.stopPropagation()}
           className="mr-2 hover:cursor-pointer"
         />
@@ -154,3 +215,5 @@ export function FileTreeItem({
     </div>
   )
 }
+
+export const FileTreeItem = memo(FileTreeItemComponent)
