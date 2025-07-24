@@ -6,10 +6,10 @@ import { deleteFromKnowledgeBaseServer } from "@/lib/api/knowledge-base-server"
  */
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } },
+  { params }: { params: Promise<{ id: string }> },
 ): Promise<NextResponse> {
   try {
-    const knowledgeBaseId = params.id
+    const { id: knowledgeBaseId } = await params
     const { searchParams } = new URL(request.url)
     const resourcePath = searchParams.get("resource_path")
 
