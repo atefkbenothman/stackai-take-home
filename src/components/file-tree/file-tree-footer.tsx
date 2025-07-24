@@ -12,7 +12,12 @@ interface FileTreeFooterProps {
 }
 
 export function FileTreeFooter({ allFiles = [] }: FileTreeFooterProps) {
-  const { getSelectionSummary, clearSelection, selectAll, getMinimalSelectedItems } = useSelection()
+  const {
+    getSelectionSummary,
+    clearSelection,
+    selectAll,
+    getMinimalSelectedItems,
+  } = useSelection()
   const { indexFiles, isIndexing } = useIndexing()
 
   const summary = getSelectionSummary()
@@ -58,7 +63,7 @@ export function FileTreeFooter({ allFiles = [] }: FileTreeFooterProps) {
             >
               {isIndexing ? "Indexing..." : "Index Selected Files"}
             </Button>
-            
+
             <Button
               onClick={clearSelection}
               variant="secondary"

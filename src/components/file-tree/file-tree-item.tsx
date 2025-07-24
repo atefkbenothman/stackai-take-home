@@ -99,17 +99,19 @@ export function FileTreeItem({ item, level = 0 }: FileTreeItemProps) {
         {/* Indexing status indicator */}
         {item.indexingStatus && (
           <div className="ml-2 flex items-center">
-            <span className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${
-              item.indexingStatus === "pending" 
-                ? "bg-yellow-100 text-yellow-800"
-                : item.indexingStatus === "indexing"
-                ? "bg-blue-100 text-blue-800"
-                : item.indexingStatus === "indexed"
-                ? "bg-green-100 text-green-800"
-                : item.indexingStatus === "error"
-                ? "bg-red-100 text-red-800"
-                : "bg-gray-100 text-gray-800"
-            }`}>
+            <span
+              className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${
+                item.indexingStatus === "pending"
+                  ? "bg-yellow-100 text-yellow-800"
+                  : item.indexingStatus === "indexing"
+                    ? "bg-blue-100 text-blue-800"
+                    : item.indexingStatus === "indexed"
+                      ? "bg-green-100 text-green-800"
+                      : item.indexingStatus === "error"
+                        ? "bg-red-100 text-red-800"
+                        : "bg-gray-100 text-gray-800"
+              }`}
+            >
               {item.indexingStatus === "pending" && "⏳ Pending"}
               {item.indexingStatus === "indexing" && "🔄 Indexing"}
               {item.indexingStatus === "indexed" && "✅ Indexed"}

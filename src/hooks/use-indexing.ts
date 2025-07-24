@@ -1,6 +1,15 @@
-import { useMutation, useQueryClient } from "@tanstack/react-query"
+import {
+  useMutation,
+  useQueryClient,
+  type QueryClient,
+  type Query,
+} from "@tanstack/react-query"
 import { toast } from "sonner"
-import { createKnowledgeBase, triggerKnowledgeBaseSync, generateKnowledgeBaseName } from "@/lib/api/knowledge-base"
+import {
+  createKnowledgeBase,
+  triggerKnowledgeBaseSync,
+  generateKnowledgeBaseName,
+} from "@/lib/api/knowledge-base"
 import type { FileItem, FilesResponse } from "@/lib/types"
 
 interface UseIndexingReturn {
@@ -10,42 +19,45 @@ interface UseIndexingReturn {
 
 // Helper function to update file status in TanStack Query cache
 function updateFileStatusInCache(
-  queryClient: any,
+  queryClient: QueryClient,
   resourceId: string,
   status: "not-indexed" | "pending" | "indexing" | "indexed" | "error",
-  error?: string
+  error?: string,
 ) {
   // Update root files cache
   queryClient.setQueryData(["files"], (oldData: FilesResponse | undefined) => {
     if (!oldData) return oldData
-    
+
     return {
       ...oldData,
-      files: oldData.files.map(file => 
-        file.resource_id === resourceId 
+      files: oldData.files.map((file) =>
+        file.resource_id === resourceId
           ? { ...file, indexingStatus: status, indexingError: error }
-          : file
-      )
+          : file,
+      ),
     }
   })
 
   // Update any folder-specific caches that might contain this file
   // This ensures consistency across all cached queries
   const queryCache = queryClient.getQueryCache()
-  queryCache.getAll().forEach((query: any) => {
+  queryCache.getAll().forEach((query: Query) => {
     if (query.queryKey[0] === "files" && query.queryKey[1]) {
-      queryClient.setQueryData(query.queryKey, (oldData: FilesResponse | undefined) => {
-        if (!oldData) return oldData
-        
-        return {
-          ...oldData,
-          files: oldData.files.map(file => 
-            file.resource_id === resourceId 
-              ? { ...file, indexingStatus: status, indexingError: error }
-              : file
-          )
-        }
-      })
+      queryClient.setQueryData(
+        query.queryKey,
+        (oldData: FilesResponse | undefined) => {
+          if (!oldData) return oldData
+
+          return {
+            ...oldData,
+            files: oldData.files.map((file) =>
+              file.resource_id === resourceId
+                ? { ...file, indexingStatus: status, indexingError: error }
+                : file,
+            ),
+          }
+        },
+      )
     }
   })
 }
@@ -53,7 +65,7 @@ function updateFileStatusInCache(
 // Extracted API function for the mutation
 async function indexFilesAPI(selectedItems: FileItem[]) {
   // Get connection info from the files API
-  const filesResponse = await fetch('/api/files')
+  const filesResponse = await fetch("/api/files")
   if (!filesResponse.ok) {
     throw new Error("Failed to get connection information")
   }
@@ -65,18 +77,23 @@ async function indexFilesAPI(selectedItems: FileItem[]) {
   }
 
   // Extract resource IDs and names for KB creation
-  const selectedResourceIds = selectedItems.map(item => item.resource_id)
-  const selectedFileNames = selectedItems.map(item => {
-    const pathParts = item.inode_path.path.split('/')
+  const selectedResourceIds = selectedItems.map((item) => item.resource_id)
+  const selectedFileNames = selectedItems.map((item) => {
+    const pathParts = item.inode_path.path.split("/")
     return pathParts[pathParts.length - 1] || item.inode_path.path
   })
 
   // Generate KB name and description
   const kbName = generateKnowledgeBaseName(selectedFileNames)
-  const kbDescription = `Knowledge Base created from ${selectedItems.length} selected file${selectedItems.length !== 1 ? 's' : ''}: ${selectedFileNames.slice(0, 3).join(', ')}${selectedFileNames.length > 3 ? ` and ${selectedFileNames.length - 3} more` : ''}`
+  const kbDescription = `Knowledge Base created from ${selectedItems.length} selected file${selectedItems.length !== 1 ? "s" : ""}: ${selectedFileNames.slice(0, 3).join(", ")}${selectedFileNames.length > 3 ? ` and ${selectedFileNames.length - 3} more` : ""}`
 
   // Create the Knowledge Base
-  const kb = await createKnowledgeBase(connectionId, selectedResourceIds, kbName, kbDescription)
+  const kb = await createKnowledgeBase(
+    connectionId,
+    selectedResourceIds,
+    kbName,
+    kbDescription,
+  )
 
   // Trigger sync/indexing
   await triggerKnowledgeBaseSync(kb.knowledge_base_id)
@@ -96,7 +113,7 @@ export function useIndexing(): UseIndexingReturn {
       }
 
       // Optimistically update all selected files to "pending" status
-      selectedItems.forEach(item => {
+      selectedItems.forEach((item) => {
         updateFileStatusInCache(queryClient, item.resource_id, "pending")
       })
 
@@ -106,23 +123,27 @@ export function useIndexing(): UseIndexingReturn {
     onSuccess: (data) => {
       const { selectedItems, kbName } = data
       // Keep files in "pending" status - future polling will update to "indexing" → "indexed"
-      toast.success(`Successfully started indexing ${selectedItems.length} file${selectedItems.length !== 1 ? 's' : ''} into "${kbName}"`)
+      toast.success(
+        `Successfully started indexing ${selectedItems.length} file${selectedItems.length !== 1 ? "s" : ""} into "${kbName}"`,
+      )
     },
     onError: (error, selectedItems) => {
       console.error("Failed to index files:", error)
-      
+
       // Rollback optimistic updates - set files back to "not-indexed"
-      selectedItems.forEach(item => {
+      selectedItems.forEach((item) => {
         updateFileStatusInCache(
-          queryClient, 
-          item.resource_id, 
-          "error", 
-          error instanceof Error ? error.message : 'Unknown error'
+          queryClient,
+          item.resource_id,
+          "error",
+          error instanceof Error ? error.message : "Unknown error",
         )
       })
 
-      toast.error(`Failed to index files: ${error instanceof Error ? error.message : 'Unknown error'}`)
-    }
+      toast.error(
+        `Failed to index files: ${error instanceof Error ? error.message : "Unknown error"}`,
+      )
+    },
   })
 
   return {

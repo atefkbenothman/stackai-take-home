@@ -9,7 +9,11 @@ import { FileTreeError } from "@/components/file-tree/file-tree-error"
 import { getFiles } from "@/lib/api/files"
 
 export function FileTree() {
-  const { data: filesData, isLoading, error } = useQuery({
+  const {
+    data: filesData,
+    isLoading,
+    error,
+  } = useQuery({
     queryKey: ["files"],
     queryFn: () => getFiles(),
     staleTime: 5 * 60 * 1000, // 5 minutes
