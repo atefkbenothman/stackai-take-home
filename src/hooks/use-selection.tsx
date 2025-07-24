@@ -37,28 +37,6 @@ export function SelectionProvider({ children }: SelectionProviderProps) {
         newSelectedIds.delete(item.resource_id)
         newSelectedItems.delete(item.resource_id)
         newFolderSelectionIntent.delete(item.resource_id)
-
-        // When deselecting a child, remove any selected parent folders
-        // so they switch to indeterminate state
-        const itemPath = item.inode_path.path
-        const allSelected = Array.from(prev.selectedItems.values())
-
-        allSelected.forEach((potentialParent) => {
-          if (
-            potentialParent.inode_type === "directory" &&
-            potentialParent.resource_id !== item.resource_id
-          ) {
-            const parentPath = potentialParent.inode_path.path
-            // Check if this item is a child of the potential parent
-            if (itemPath.startsWith(parentPath + "/")) {
-              // Remove parent from selection (it will show as indeterminate)
-              newSelectedIds.delete(potentialParent.resource_id)
-              newSelectedItems.delete(potentialParent.resource_id)
-              // Keep it in folderSelectionIntent to remember the intent
-              // This is useful for the getMinimalSelectedItems logic
-            }
-          }
-        })
       } else {
         // Select item
         newSelectedIds.add(item.resource_id)
