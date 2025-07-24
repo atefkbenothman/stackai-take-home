@@ -1,5 +1,6 @@
 "use client"
 
+import Image from "next/image"
 import { useState, useCallback } from "react"
 import { ArrowUpDown, Check, Search, X, ListFilter } from "lucide-react"
 import {
@@ -181,7 +182,16 @@ export function FileTreeHeader({
 }: FileTreeHeaderProps) {
   return (
     <div className="flex h-10 items-center justify-between border-b bg-gray-200 p-2">
-      <p className="text-md font-semibold text-gray-700">File Picker</p>
+      <div className="flex items-center gap-2">
+        <Image
+          src="/google-drive-svg.svg"
+          alt="Google Drive"
+          width={16}
+          height={16}
+          className="h-4 w-4"
+        />
+        <p className="text-sm font-semibold text-gray-700">Google Drive</p>
+      </div>
       <div className="flex items-center gap-2">
         <SortSection sortBy={sortBy} onSortChange={onSortChange} />
         <FilterSection
