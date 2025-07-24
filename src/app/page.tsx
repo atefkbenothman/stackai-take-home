@@ -26,12 +26,14 @@ export default async function Home() {
 
   return (
     <HydrationBoundary state={dehydratedState}>
-      <div className="p-4">
-        {rootData ? (
-          <FileTree files={rootData.files} />
-        ) : (
-          <FileTreeSkeleton count={8} />
-        )}
+      <div className="flex min-h-screen items-center justify-center p-4">
+        <div className="w-full max-w-4xl">
+          {rootData ? (
+            <FileTree files={rootData.files} />
+          ) : (
+            <FileTreeSkeleton count={8} />
+          )}
+        </div>
       </div>
     </HydrationBoundary>
   )

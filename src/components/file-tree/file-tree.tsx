@@ -10,11 +10,11 @@ interface FileTreeProps {
 
 export function FileTree({ files }: FileTreeProps) {
   return (
-    <div className="rounded border bg-white">
+    <div className="border bg-white shadow-sm">
       <div className="flex h-10 items-center border-b bg-gray-200 p-2">
         <h2 className="text-sm font-semibold text-gray-700">File Picker</h2>
       </div>
-      <div className="my-2 max-h-96 overflow-y-auto">
+      <div className="my-2 h-[500px] overflow-y-auto">
         {files.map((file) => (
           <FileTreeItem key={file.resource_id} item={file} level={0} />
         ))}

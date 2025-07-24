@@ -100,9 +100,11 @@ export function FileTreeItem({ item, level = 0 }: FileTreeItemProps) {
           )}
         </div>
 
-        <span className="truncate font-mono text-sm">
-          {item.inode_path.path}
-        </span>
+        <div className="flex-1 overflow-x-auto min-w-0">
+          <span className="font-mono text-sm whitespace-nowrap">
+            {item.inode_path.path}
+          </span>
+        </div>
       </div>
 
       {isFolder && isExpanded && (
