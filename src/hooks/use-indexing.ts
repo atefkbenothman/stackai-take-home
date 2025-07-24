@@ -4,17 +4,20 @@ import {
   type QueryClient,
   type Query,
 } from "@tanstack/react-query"
+import { useState, useEffect } from "react"
 import { toast } from "sonner"
 import {
   createKnowledgeBase,
   triggerKnowledgeBaseSync,
   generateKnowledgeBaseName,
 } from "@/lib/api/knowledge-base"
+import { useIndexingStatus } from "./use-indexing-status"
 import type { FileItem, FilesResponse } from "@/lib/types"
 
 interface UseIndexingReturn {
   indexFiles: (selectedItems: FileItem[]) => void
   isIndexing: boolean
+  isPolling: boolean
 }
 
 // Helper function to update file status in TanStack Query cache
@@ -103,6 +106,10 @@ async function indexFilesAPI(selectedItems: FileItem[]) {
 
 export function useIndexing(): UseIndexingReturn {
   const queryClient = useQueryClient()
+  const [activeIndexing, setActiveIndexing] = useState<{
+    knowledgeBaseId: string
+    selectedFiles: FileItem[]
+  } | null>(null)
 
   const mutation = useMutation({
     mutationFn: indexFilesAPI,
@@ -121,8 +128,22 @@ export function useIndexing(): UseIndexingReturn {
       return { selectedItems }
     },
     onSuccess: (data) => {
-      const { selectedItems, kbName } = data
-      // Keep files in "pending" status - future polling will update to "indexing" → "indexed"
+      const { kb, selectedItems, kbName } = data
+      
+      console.log('🎉 KB Creation Success:', {
+        kbId: kb.knowledge_base_id,
+        selectedItemsCount: selectedItems.length,
+        kbName,
+      })
+      
+      // Start status polling
+      setActiveIndexing({
+        knowledgeBaseId: kb.knowledge_base_id,
+        selectedFiles: selectedItems,
+      })
+
+      console.log('🚀 Started status polling for KB:', kb.knowledge_base_id)
+
       toast.success(
         `Successfully started indexing ${selectedItems.length} file${selectedItems.length !== 1 ? "s" : ""} into "${kbName}"`,
       )
@@ -130,7 +151,7 @@ export function useIndexing(): UseIndexingReturn {
     onError: (error, selectedItems) => {
       console.error("Failed to index files:", error)
 
-      // Rollback optimistic updates - set files back to "not-indexed"
+      // Rollback optimistic updates - set files back to "error"
       selectedItems.forEach((item) => {
         updateFileStatusInCache(
           queryClient,
@@ -146,8 +167,37 @@ export function useIndexing(): UseIndexingReturn {
     },
   })
 
+  // Use status polling hook
+  const { isPolling, allFilesCompleted } = useIndexingStatus({
+    knowledgeBaseId: activeIndexing?.knowledgeBaseId || null,
+    selectedFiles: activeIndexing?.selectedFiles || [],
+    isActive: !!activeIndexing,
+  })
+
+  // Stop polling when all files are completed
+  useEffect(() => {
+    console.log('🎯 Completion check:', {
+      allFilesCompleted,
+      hasActiveIndexing: !!activeIndexing,
+      activeIndexingKB: activeIndexing?.knowledgeBaseId,
+    })
+
+    if (allFilesCompleted && activeIndexing) {
+      console.log('🏁 All files completed! Stopping polling.')
+      setActiveIndexing(null)
+      toast.success("Indexing completed!")
+    }
+  }, [allFilesCompleted, activeIndexing])
+
+  console.log('🔄 useIndexing state:', {
+    isIndexing: mutation.isPending,
+    isPolling,
+    activeIndexingKB: activeIndexing?.knowledgeBaseId,
+  })
+
   return {
     indexFiles: mutation.mutate,
     isIndexing: mutation.isPending,
+    isPolling,
   }
 }

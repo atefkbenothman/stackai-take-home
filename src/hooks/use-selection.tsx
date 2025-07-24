@@ -162,21 +162,27 @@ export function SelectionProvider({ children }: SelectionProviderProps) {
 
     // Filter out items whose parent folder is already selected
     return allSelected.filter((item) => {
-      const itemPath = item.inode_path.path
+      // Check if any ancestor of this item is also selected
+      const hasSelectedAncestor = (currentItem: FileItem): boolean => {
+        if (!currentItem.parentId) return false
 
-      // Check if any other selected item is a parent of this item
-      const hasSelectedParent = allSelected.some((potentialParent) => {
-        if (potentialParent.resource_id === item.resource_id) return false
-        if (potentialParent.inode_type !== "directory") return false
+        // Check if direct parent is selected
+        if (selectionState.selectedIds.has(currentItem.parentId)) {
+          return true
+        }
 
-        const parentPath = potentialParent.inode_path.path
-        // Check if itemPath starts with parentPath followed by /
-        return itemPath.startsWith(parentPath + "/")
-      })
+        // Recursively check ancestors by finding the parent in selected items
+        const parentItem = allSelected.find(p => p.resource_id === currentItem.parentId)
+        if (parentItem) {
+          return hasSelectedAncestor(parentItem)
+        }
 
-      return !hasSelectedParent
+        return false
+      }
+
+      return !hasSelectedAncestor(item)
     })
-  }, [selectionState.selectedItems])
+  }, [selectionState.selectedItems, selectionState.selectedIds])
 
   const getSelectionSummary = useMemo(() => {
     const items = Array.from(selectionState.selectedItems.values())
