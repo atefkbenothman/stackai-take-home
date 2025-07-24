@@ -1,37 +1,31 @@
 interface FileSkeletonProps {
   level?: number
-  count?: number
 }
 
-export function FileSkeleton({ level = 0, count = 1 }: FileSkeletonProps) {
+export function FileSkeleton({ level = 0 }: FileSkeletonProps) {
   return (
-    <div>
-      {Array.from({ length: count }).map((_, index) => (
+    <div
+      className="flex animate-pulse items-center px-2 py-1"
+      style={{ paddingLeft: `${level * 20 + 8}px` }}
+    >
+      {/* Checkbox space */}
+      <div className="mr-2 h-4 w-4" />
+
+      {/* Empty space for toggle icon */}
+      <div className="mr-2 h-4 w-4" />
+
+      {/* File/folder icon skeleton - matches actual icon size */}
+      <div className="mr-2 h-5 w-5 rounded bg-gray-200" />
+
+      {/* Name skeleton container - matches scrollable structure */}
+      <div className="min-w-0 flex-1">
         <div
-          key={index}
-          className="flex animate-pulse items-center px-2 py-1"
-          style={{ paddingLeft: `${level * 20 + 8}px` }}
-        >
-          {/* Checkbox space */}
-          <div className="mr-2 h-4 w-4"></div>
-
-          {/* Empty space for toggle icon */}
-          <div className="mr-2 h-4 w-4"></div>
-
-          {/* File/folder icon skeleton - matches actual icon size */}
-          <div className="mr-2 h-5 w-5 rounded bg-gray-200"></div>
-
-          {/* Name skeleton container - matches scrollable structure */}
-          <div className="flex-1 min-w-0">
-            <div
-              className="h-4 rounded bg-gray-200"
-              style={{
-                width: `${Math.floor(Math.random() * 80 + 60)}px`, // Random width between 60-140px
-              }}
-            ></div>
-          </div>
-        </div>
-      ))}
+          className="h-4 rounded bg-gray-200"
+          style={{
+            width: `${Math.floor(Math.random() * 80 + 60)}px`, // Random width between 60-140px
+          }}
+        ></div>
+      </div>
     </div>
   )
 }

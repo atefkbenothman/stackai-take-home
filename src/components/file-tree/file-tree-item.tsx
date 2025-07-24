@@ -4,7 +4,7 @@ import React from "react"
 import { Plus, Minus, Folder, FolderOpen, File } from "lucide-react"
 import type { FileItem } from "@/lib/types"
 import { FileSkeleton } from "@/components/file-tree/file-skeleton"
-import { useSelection } from "@/contexts/selection-context"
+import { useSelection } from "@/hooks/use-selection"
 import { Checkbox } from "@/components/ui/checkbox"
 import { useFolderOperations } from "@/hooks/use-folder-operations"
 
@@ -91,7 +91,11 @@ export function FileTreeItem({ item, level = 0 }: FileTreeItemProps) {
 
       {isFolder && isExpanded && (
         <div className="animate-in slide-in-from-left-1 duration-150">
-          {isLoading && <FileSkeleton level={level + 1} count={1} />}
+          {isLoading && (
+            <div className="h-8 border-b">
+              <FileSkeleton level={level + 1} />
+            </div>
+          )}
           {!isLoading && !error && folderData?.files && (
             <div>
               {folderData.files.map((childFile: FileItem) => (

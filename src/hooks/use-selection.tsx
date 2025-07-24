@@ -42,10 +42,12 @@ export function SelectionProvider({ children }: SelectionProviderProps) {
         // so they switch to indeterminate state
         const itemPath = item.inode_path.path
         const allSelected = Array.from(prev.selectedItems.values())
-        
+
         allSelected.forEach((potentialParent) => {
-          if (potentialParent.inode_type === "directory" && 
-              potentialParent.resource_id !== item.resource_id) {
+          if (
+            potentialParent.inode_type === "directory" &&
+            potentialParent.resource_id !== item.resource_id
+          ) {
             const parentPath = potentialParent.inode_path.path
             // Check if this item is a child of the potential parent
             if (itemPath.startsWith(parentPath + "/")) {
@@ -97,9 +99,6 @@ export function SelectionProvider({ children }: SelectionProviderProps) {
               newSelectedIds.delete(child.resource_id)
               newSelectedItems.delete(child.resource_id)
               newFolderSelectionIntent.delete(child.resource_id)
-
-              // Note: For simplicity, we're not recursively fetching nested children here
-              // In a production app, you might want to track the full tree structure
             })
           }
           deselectedChildren(children)
@@ -177,21 +176,21 @@ export function SelectionProvider({ children }: SelectionProviderProps) {
 
   const getMinimalSelectedItems = useCallback(() => {
     const allSelected = Array.from(selectionState.selectedItems.values())
-    
+
     // Filter out items whose parent folder is already selected
     return allSelected.filter((item) => {
       const itemPath = item.inode_path.path
-      
+
       // Check if any other selected item is a parent of this item
       const hasSelectedParent = allSelected.some((potentialParent) => {
         if (potentialParent.resource_id === item.resource_id) return false
         if (potentialParent.inode_type !== "directory") return false
-        
+
         const parentPath = potentialParent.inode_path.path
         // Check if itemPath starts with parentPath followed by /
         return itemPath.startsWith(parentPath + "/")
       })
-      
+
       return !hasSelectedParent
     })
   }, [selectionState.selectedItems])
@@ -214,62 +213,67 @@ export function SelectionProvider({ children }: SelectionProviderProps) {
       if (folder.inode_type !== "directory") {
         return false // Not a folder
       }
-      
+
       if (selectionState.selectedIds.has(folder.resource_id)) {
         return false // Fully selected, not indeterminate
       }
 
       const folderPath = folder.inode_path.path
-      
+
       // Check if any selected item is a descendant of this folder
-      const selectedDescendants = Array.from(selectionState.selectedItems.values()).filter(
-        item => 
+      const selectedDescendants = Array.from(
+        selectionState.selectedItems.values(),
+      ).filter(
+        (item) =>
           item.resource_id !== folder.resource_id &&
-          item.inode_path.path.startsWith(folderPath + "/")
+          item.inode_path.path.startsWith(folderPath + "/"),
       )
-      
+
       if (selectedDescendants.length === 0) {
         return false // No descendants selected
       }
-      
+
       // Has at least one descendant selected
       // If we have children data, check if all immediate children are selected
       if (children.length > 0) {
         const allChildrenSelected = children.every((child) =>
-          selectionState.selectedIds.has(child.resource_id)
+          selectionState.selectedIds.has(child.resource_id),
         )
         return !allChildrenSelected // Indeterminate if not all children selected
       }
-      
+
       // No children data (collapsed), but has descendants selected
       return true
     },
     [selectionState.selectedIds, selectionState.selectedItems],
   )
 
-  const contextValue: SelectionContextType = useMemo(() => ({
-    ...selectionState,
-    toggleSelection,
-    toggleFolderSelection,
-    selectAll,
-    clearSelection,
-    isSelected,
-    isIndeterminate,
-    getSelectedItems,
-    getMinimalSelectedItems,
-    getSelectionSummary: () => getSelectionSummary,
-  }), [
-    selectionState,
-    toggleSelection,
-    toggleFolderSelection,
-    selectAll,
-    clearSelection,
-    isSelected,
-    isIndeterminate,
-    getSelectedItems,
-    getMinimalSelectedItems,
-    getSelectionSummary,
-  ])
+  const contextValue: SelectionContextType = useMemo(
+    () => ({
+      ...selectionState,
+      toggleSelection,
+      toggleFolderSelection,
+      selectAll,
+      clearSelection,
+      isSelected,
+      isIndeterminate,
+      getSelectedItems,
+      getMinimalSelectedItems,
+      getSelectionSummary: () => getSelectionSummary,
+    }),
+    [
+      selectionState,
+      toggleSelection,
+      toggleFolderSelection,
+      selectAll,
+      clearSelection,
+      isSelected,
+      isIndeterminate,
+      getSelectedItems,
+      getMinimalSelectedItems,
+      getSelectionSummary,
+    ],
+  )
 
   return (
     <SelectionContext.Provider value={contextValue}>

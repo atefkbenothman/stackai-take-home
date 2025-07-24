@@ -1,7 +1,7 @@
 "use client"
 
 import { X } from "lucide-react"
-import { useSelection } from "@/contexts/selection-context"
+import { useSelection } from "@/hooks/use-selection"
 import { Button } from "@/components/ui/button"
 import type { FileItem } from "@/lib/types"
 import { useCallback } from "react"
