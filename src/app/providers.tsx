@@ -2,9 +2,17 @@
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 
-export default function Providers({ children }: { children: React.ReactNode }) {
-  const queryClient = new QueryClient()
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 5 * 60 * 1000,
+      gcTime: 10 * 60 * 1000,
+      retry: 3,
+    },
+  },
+})
 
+export default function Providers({ children }: { children: React.ReactNode }) {
   return (
     <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
   )
