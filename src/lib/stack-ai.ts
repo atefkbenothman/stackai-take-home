@@ -1,4 +1,4 @@
-import { getAuthToken } from "@/app/api/auth"
+import { getAuthToken } from "@/lib/auth"
 
 /**
  * Get organization info for the authenticated user

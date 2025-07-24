@@ -1,11 +1,15 @@
 import { cookies } from "next/headers"
 
-/*
- * This function is used to get the auth token for the Stack AI API.
- * It checks if we have a cached token and returns it if it's still valid.
- * If not, it fetches a fresh token and caches it in cookies.
+/**
+ * Server-side authentication utilities for Stack AI
  */
-export async function getAuthToken() {
+
+/**
+ * Get authentication token for Stack AI API
+ * Handles token caching with HTTP-only cookies for security
+ * Automatically refreshes expired tokens
+ */
+export async function getAuthToken(): Promise<string> {
   const cookieStore = await cookies()
   const tokenCookie = cookieStore.get("stack_ai_token")
   const expirationCookie = cookieStore.get("stack_ai_expires")
@@ -21,7 +25,7 @@ export async function getAuthToken() {
     }
   }
 
-  // Fetch fresh token
+  // Fetch fresh token from Supabase Auth
   const supabaseAuthUrl = process.env.STACK_AI_AUTH_URL!
   const anonKey = process.env.SUPABASE_ANON_KEY!
   const email = process.env.EMAIL!
@@ -49,7 +53,7 @@ export async function getAuthToken() {
 
   const data = await response.json()
 
-  // Cache in cookies (only in Route Handler context)
+  // Cache token in HTTP-only cookies for security
   // Skip cookie setting in RSC context to avoid "Cookies can only be modified" error
   try {
     const expiresAt = Date.now() + data.expires_in * 1000
@@ -68,7 +72,7 @@ export async function getAuthToken() {
       maxAge: data.expires_in,
     })
   } catch {
-    console.log("Cookie setting skipped")
+    console.log("Cookie setting skipped in RSC context")
   }
 
   return data.access_token

@@ -1,3 +1,4 @@
+import { stackAIClient } from "@/lib/stack-ai-client"
 import type {
   FilesResponse,
   KnowledgeBase,
@@ -8,42 +9,19 @@ import type {
  * Fetch files from Google Drive connection
  */
 export async function fetchFiles(folderId?: string): Promise<FilesResponse> {
-  const url = `/api/files${folderId ? `?folderId=${folderId}` : ""}`
-  const response = await fetch(url)
-
-  if (!response.ok) {
-    throw new Error(`Failed to fetch files: ${response.status}`)
-  }
-
-  return response.json()
+  return stackAIClient.fetchFiles(folderId)
 }
 
 /**
  * Create a new Knowledge Base with selected files
  */
 export async function createKnowledgeBase(
-  connectionId: string,
+  _connectionId: string, // No longer needed, kept for backward compatibility
   selectedResourceIds: string[],
   name: string,
   description: string,
 ): Promise<KnowledgeBase> {
-  const response = await fetch("/api/knowledge-bases", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      connectionId,
-      selectedResourceIds,
-      name,
-      description,
-    }),
-  })
-
-  if (!response.ok) {
-    const error = await response.text()
-    throw new Error(`Failed to create knowledge base: ${error}`)
-  }
-
-  return response.json()
+  return stackAIClient.createKnowledgeBase(selectedResourceIds, name, description)
 }
 
 /**
@@ -52,16 +30,7 @@ export async function createKnowledgeBase(
 export async function triggerKnowledgeBaseSync(
   knowledgeBaseId: string,
 ): Promise<{ message: string }> {
-  const response = await fetch(`/api/knowledge-bases/${knowledgeBaseId}/sync`, {
-    method: "POST",
-  })
-
-  if (!response.ok) {
-    const error = await response.text()
-    throw new Error(`Failed to trigger sync: ${error}`)
-  }
-
-  return response.json()
+  return stackAIClient.triggerKnowledgeBaseSync(knowledgeBaseId)
 }
 
 /**
@@ -71,17 +40,7 @@ export async function getKnowledgeBaseStatus(
   knowledgeBaseId: string,
   resourcePath: string = "/",
 ): Promise<KBStatusResponse> {
-  const params = new URLSearchParams({ resource_path: resourcePath })
-  const response = await fetch(
-    `/api/knowledge-bases/${knowledgeBaseId}/status?${params}`,
-  )
-
-  if (!response.ok) {
-    const error = await response.text()
-    throw new Error(`Failed to get status: ${error}`)
-  }
-
-  return response.json()
+  return stackAIClient.getKnowledgeBaseStatus(knowledgeBaseId, resourcePath)
 }
 
 /**
@@ -91,28 +50,12 @@ export async function deleteFromKnowledgeBase(
   knowledgeBaseId: string,
   resourcePath: string,
 ): Promise<void> {
-  const params = new URLSearchParams({ resource_path: resourcePath })
-  const response = await fetch(
-    `/api/knowledge-bases/${knowledgeBaseId}/resources?${params}`,
-    { method: "DELETE" },
-  )
-
-  if (!response.ok) {
-    const error = await response.text()
-    throw new Error(`Failed to delete resource: ${error}`)
-  }
+  return stackAIClient.deleteFromKnowledgeBase(knowledgeBaseId, resourcePath)
 }
 
 /**
  * Get all Knowledge Bases for the current organization
  */
 export async function listKnowledgeBases(): Promise<KnowledgeBase[]> {
-  const response = await fetch("/api/knowledge-bases")
-
-  if (!response.ok) {
-    const error = await response.text()
-    throw new Error(`Failed to list knowledge bases: ${error}`)
-  }
-
-  return response.json()
+  return stackAIClient.listKnowledgeBases()
 }

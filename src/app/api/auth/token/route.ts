@@ -1,0 +1,35 @@
+import { NextResponse } from "next/server"
+import { getAuthToken } from "@/lib/auth"
+import { getOrgInfo, getGoogleDriveConnection } from "@/lib/stack-ai"
+
+/**
+ * GET /api/auth/token - Get authentication token and connection info for client-side Stack AI calls
+ */
+export async function GET(): Promise<NextResponse> {
+  try {
+    const token = await getAuthToken()
+
+    // Get organization and connection info needed for Stack AI API calls
+    const orgData = await getOrgInfo(token)
+    const connection = await getGoogleDriveConnection(token)
+
+    // Return token and connection info for client use
+    return NextResponse.json({
+      token,
+      expires_in: 3600,
+      org_id: orgData.org_id,
+      connection_id: connection.connection_id,
+    })
+  } catch (error) {
+    console.error("Failed to get auth token:", error)
+    return NextResponse.json(
+      {
+        error:
+          error instanceof Error
+            ? error.message
+            : "Failed to get authentication token",
+      },
+      { status: 500 },
+    )
+  }
+}
