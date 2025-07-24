@@ -49,7 +49,7 @@ export function FileTree() {
   } = useQuery({
     queryKey: ["files"],
     queryFn: () => getFiles(),
-    staleTime: 5 * 60 * 1000, // 5 minutes
+    staleTime: 5 * 60 * 1000,
   })
 
   const displayFiles = useMemo(() => {
@@ -61,7 +61,6 @@ export function FileTree() {
       )
       return filterByExtension(searchResults, filterExtension)
     } else {
-      // Normal tree view
       if (!filesData?.files) return []
       const filteredFiles = filterByExtension(filesData.files, filterExtension)
       return sortFiles(filteredFiles, sortBy)

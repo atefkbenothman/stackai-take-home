@@ -1,23 +1,18 @@
 "use client"
 
-import React from "react"
 import {
   ChevronRight,
   ChevronDown,
+  File,
   Folder,
   FolderOpen,
-  File,
-  Clock,
-  Loader2,
-  CheckCircle,
-  XCircle,
-  Circle,
 } from "lucide-react"
-import type { FileItem } from "@/lib/types"
-import { FileTreeItemSkeleton } from "@/components/file-tree/file-tree-item-skeleton"
-import { useSelection } from "@/hooks/use-selection"
 import { Checkbox } from "@/components/ui/checkbox"
+import { FileTreeItemSkeleton } from "@/components/file-tree/file-tree-item-skeleton"
+import { StatusBadge } from "@/components/file-tree/file-tree-status-badge"
 import { useFolderOperations } from "@/hooks/use-folder-operations"
+import { useSelection } from "@/hooks/use-selection"
+import type { FileItem } from "@/lib/types"
 import {
   formatDate,
   sortFiles,
@@ -117,50 +112,7 @@ export function FileTreeItem({
         {/* Indexing status indicator */}
         {item.indexingStatus && (
           <div className="ml-2 flex items-center">
-            <span
-              className={`inline-flex items-center gap-1 rounded-xs px-2 py-1 text-xs font-medium ${
-                item.indexingStatus === "pending"
-                  ? "bg-yellow-100 text-yellow-800"
-                  : item.indexingStatus === "indexing"
-                    ? "bg-blue-100 text-blue-800"
-                    : item.indexingStatus === "indexed"
-                      ? "bg-green-100 text-green-800"
-                      : item.indexingStatus === "error"
-                        ? "bg-red-100 text-red-800"
-                        : "bg-gray-100 text-gray-800"
-              }`}
-            >
-              {item.indexingStatus === "pending" && (
-                <>
-                  <Clock size={12} />
-                  Pending
-                </>
-              )}
-              {item.indexingStatus === "indexing" && (
-                <>
-                  <Loader2 size={12} className="animate-spin" />
-                  Indexing
-                </>
-              )}
-              {item.indexingStatus === "indexed" && (
-                <>
-                  <CheckCircle size={12} />
-                  Indexed
-                </>
-              )}
-              {item.indexingStatus === "error" && (
-                <>
-                  <XCircle size={12} />
-                  Error
-                </>
-              )}
-              {item.indexingStatus === "not-indexed" && (
-                <>
-                  <Circle size={12} />
-                  Not Indexed
-                </>
-              )}
-            </span>
+            <StatusBadge status={item.indexingStatus} />
           </div>
         )}
 

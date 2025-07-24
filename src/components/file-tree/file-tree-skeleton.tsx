@@ -9,10 +9,10 @@ export function FileTreeSkeleton() {
     <div className="rounded border bg-white shadow-sm">
       <FileTreeHeader
         sortBy="name"
-        onSortChange={() => {}}
         searchQuery=""
-        onSearchChange={() => {}}
         filterExtension="all"
+        onSearchChange={() => {}}
+        onSortChange={() => {}}
         onFilterChange={() => {}}
       />
       <div className="h-[500px] w-full overflow-y-auto">

@@ -17,8 +17,8 @@ const geistMono = Geist_Mono({
 })
 
 export const metadata: Metadata = {
-  title: "Stack AI Take Home - Kai",
-  description: "Stack AI Take Home",
+  title: "StackAI Take Home - Kai",
+  description: "StackAI Take Home",
 }
 
 export default function RootLayout({

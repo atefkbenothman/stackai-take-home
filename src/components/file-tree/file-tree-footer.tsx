@@ -1,10 +1,16 @@
 "use client"
 
 import { useSelection } from "@/hooks/use-selection"
-import { useIndexing } from "@/hooks/use-indexing"
+import { useFileIndexing } from "@/hooks/use-file-indexing"
 import { Button } from "@/components/ui/button"
 import type { FileItem } from "@/lib/types"
 import { useCallback } from "react"
+
+function getIndexButtonText(isIndexing: boolean, isPolling: boolean): string {
+  if (isIndexing) return "Creating KB..."
+  if (isPolling) return "Monitoring..."
+  return "Index"
+}
 
 interface FileTreeFooterProps {
   allFiles?: FileItem[]
@@ -17,7 +23,7 @@ export function FileTreeFooter({ allFiles = [] }: FileTreeFooterProps) {
     selectAll,
     getMinimalSelectedItems,
   } = useSelection()
-  const { indexFiles, isIndexing, isPolling } = useIndexing()
+  const { indexFiles, isIndexing, isPolling } = useFileIndexing()
 
   const summary = getSelectionSummary()
 
@@ -60,13 +66,8 @@ export function FileTreeFooter({ allFiles = [] }: FileTreeFooterProps) {
               size="sm"
               className="h-6 rounded-xs bg-blue-500 px-2 text-xs text-white hover:cursor-pointer hover:bg-blue-600"
             >
-              {isIndexing
-                ? "Creating KB..."
-                : isPolling
-                  ? "Monitoring..."
-                  : "Index"}
+              {getIndexButtonText(isIndexing, isPolling)}
             </Button>
-
             <Button
               onClick={clearSelection}
               variant="outline"
