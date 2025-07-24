@@ -98,7 +98,7 @@ function FilterSection({
           <ListFilter size={14} />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-60 p-3" align="end">
+      <PopoverContent className="w-60 rounded-xs p-3" align="end">
         <div className="space-y-2">
           <h4 className="text-sm font-medium">Filter by Extension</h4>
           <div className="relative">
@@ -106,7 +106,7 @@ function FilterSection({
               value={filterInputValue}
               onChange={handleFilterInputChange}
               placeholder="Enter extension"
-              className="h-8 pr-8 text-xs"
+              className="h-8 rounded-xs pr-8 text-xs"
             />
             {filterInputValue && (
               <Button
@@ -142,7 +142,7 @@ function SortSection({ sortBy, onSortChange }: SortSectionProps) {
           <ArrowUpDown size={14} />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-32">
+      <DropdownMenuContent align="end" className="w-32 rounded-xs">
         <DropdownMenuItem
           className="cursor-pointer"
           onClick={() => onSortChange("name")}
