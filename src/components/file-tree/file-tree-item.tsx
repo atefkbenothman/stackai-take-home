@@ -66,9 +66,7 @@ export function FileTreeItem({ item, level = 0 }: FileTreeItemProps) {
         onMouseEnter={handleMouseEnter}
       >
         <Checkbox
-          checked={itemIsSelected}
-          // @ts-ignore - Radix checkbox supports indeterminate but types might not reflect it
-          indeterminate={itemIsIndeterminate || undefined}
+          checked={itemIsIndeterminate ? "indeterminate" : itemIsSelected}
           onCheckedChange={() => {
             if (isFolder && folderData?.files) {
               toggleFolderSelection(item, folderData.files)

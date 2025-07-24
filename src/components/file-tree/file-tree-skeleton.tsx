@@ -1,4 +1,5 @@
 import { FileSkeleton } from "@/components/file-tree/file-skeleton"
+import { SelectionSummary } from "@/components/file-tree/selection-summary"
 
 interface FileTreeSkeletonProps {
   count?: number
@@ -6,13 +7,14 @@ interface FileTreeSkeletonProps {
 
 export function FileTreeSkeleton({ count = 8 }: FileTreeSkeletonProps) {
   return (
-    <div className="border bg-white">
-      <div className="border-b bg-gray-200 p-2">
-        <h2 className="text-sm font-semibold text-gray-700">Files</h2>
+    <div className="rounded border bg-white">
+      <div className="flex h-10 items-center border-b bg-gray-200 p-2">
+        <h2 className="text-sm font-semibold text-gray-700">File Picker</h2>
       </div>
-      <div className="-mx-4 max-h-96 overflow-y-auto py-2">
+      <div className="-mx-4 my-2 max-h-96 overflow-y-auto">
         <FileSkeleton level={0} count={count} />
       </div>
+      <SelectionSummary allFiles={[]} />
     </div>
   )
 }
