@@ -155,7 +155,7 @@ export function SelectionProvider({ children }: SelectionProviderProps) {
     })
   }, [selectionState.selectedItems, selectedIds])
 
-  const getSelectionSummary = useMemo(() => {
+  const getSelectionSummary = useCallback(() => {
     const items = Array.from(selectionState.selectedItems.values())
     const count = items.length
     const totalSize = items.reduce((sum, item) => {
@@ -167,10 +167,6 @@ export function SelectionProvider({ children }: SelectionProviderProps) {
       totalSize,
     }
   }, [selectionState.selectedItems])
-
-  const getSelectionSummaryFn = useCallback(() => {
-    return getSelectionSummary
-  }, [getSelectionSummary])
 
   const isIndeterminate = useCallback(
     (folder: FileItem, children: FileItem[] = []) => {
@@ -243,7 +239,7 @@ export function SelectionProvider({ children }: SelectionProviderProps) {
       isIndeterminate,
       getSelectedItems,
       getMinimalSelectedItems,
-      getSelectionSummary: getSelectionSummaryFn,
+      getSelectionSummary,
     }),
     [
       selectionState,
@@ -257,7 +253,7 @@ export function SelectionProvider({ children }: SelectionProviderProps) {
       isIndeterminate,
       getSelectedItems,
       getMinimalSelectedItems,
-      getSelectionSummaryFn,
+      getSelectionSummary,
     ],
   )
 

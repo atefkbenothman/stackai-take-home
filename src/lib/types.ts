@@ -48,8 +48,6 @@ export interface FilesResponse {
 
 export interface SelectionState {
   selectedItems: Map<string, FileItem>
-  selectedIds?: Set<string>
-  folderSelectionIntent?: Set<string>
 }
 
 export interface SelectionActions {
@@ -116,9 +114,3 @@ export interface KBStatusResponse {
   data: KBResource[]
 }
 
-export interface IndexingOperation {
-  knowledgeBaseId: string
-  startedAt: string
-  selectedFiles: FileItem[]
-  status: "active" | "completed" | "failed"
-}

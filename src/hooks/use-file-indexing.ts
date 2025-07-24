@@ -85,7 +85,7 @@ export function useFileIndexing(): UseFileIndexingReturn {
         updateFileIndexingStatus(queryClient, item.resource_id, "pending")
       })
 
-      toast.success("Starting indexing process...")
+      toast.info("Starting indexing process...")
       return { selectedItems }
     },
     onSuccess: (data) => {
