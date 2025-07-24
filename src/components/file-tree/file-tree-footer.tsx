@@ -1,6 +1,5 @@
 "use client"
 
-import { X } from "lucide-react"
 import { useSelection } from "@/hooks/use-selection"
 import { useIndexing } from "@/hooks/use-indexing"
 import { Button } from "@/components/ui/button"

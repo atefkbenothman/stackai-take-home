@@ -129,20 +129,12 @@ export function useIndexing(): UseIndexingReturn {
     },
     onSuccess: (data) => {
       const { kb, selectedItems, kbName } = data
-      
-      console.log('🎉 KB Creation Success:', {
-        kbId: kb.knowledge_base_id,
-        selectedItemsCount: selectedItems.length,
-        kbName,
-      })
-      
+
       // Start status polling
       setActiveIndexing({
         knowledgeBaseId: kb.knowledge_base_id,
         selectedFiles: selectedItems,
       })
-
-      console.log('🚀 Started status polling for KB:', kb.knowledge_base_id)
 
       toast.success(
         `Successfully started indexing ${selectedItems.length} file${selectedItems.length !== 1 ? "s" : ""} into "${kbName}"`,
@@ -176,24 +168,11 @@ export function useIndexing(): UseIndexingReturn {
 
   // Stop polling when all files are completed
   useEffect(() => {
-    console.log('🎯 Completion check:', {
-      allFilesCompleted,
-      hasActiveIndexing: !!activeIndexing,
-      activeIndexingKB: activeIndexing?.knowledgeBaseId,
-    })
-
     if (allFilesCompleted && activeIndexing) {
-      console.log('🏁 All files completed! Stopping polling.')
       setActiveIndexing(null)
       toast.success("Indexing completed!")
     }
   }, [allFilesCompleted, activeIndexing])
-
-  console.log('🔄 useIndexing state:', {
-    isIndexing: mutation.isPending,
-    isPolling,
-    activeIndexingKB: activeIndexing?.knowledgeBaseId,
-  })
 
   return {
     indexFiles: mutation.mutate,

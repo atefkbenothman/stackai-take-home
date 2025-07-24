@@ -5,7 +5,14 @@ import { FileTreeHeader } from "@/components/file-tree/file-tree-header"
 export function FileTreeSkeleton() {
   return (
     <div className="rounded border bg-white shadow-sm">
-      <FileTreeHeader />
+      <FileTreeHeader
+        sortBy="name"
+        onSortChange={() => {}}
+        searchQuery=""
+        onSearchChange={() => {}}
+        filterExtension="all"
+        onFilterChange={() => {}}
+      />
       <div className="h-[500px] w-full overflow-y-auto">
         {Array.from({ length: 13 }).map((_, index) => (
           <div className="border-b" key={index}>

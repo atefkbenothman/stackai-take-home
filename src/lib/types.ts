@@ -6,6 +6,22 @@ export type IndexingStatus =
   | "indexed"
   | "error"
 
+// Raw file from API
+export interface RawFileFromAPI {
+  resource_id: string
+  inode_type: "directory" | "file"
+  inode_path: {
+    path: string
+  }
+  created_at: string
+  modified_at: string
+  dataloader_metadata?: {
+    size?: number
+    content_mime?: string
+    web_url?: string
+  }
+}
+
 export interface FileItem {
   resource_id: string
   inode_type: "directory" | "file"

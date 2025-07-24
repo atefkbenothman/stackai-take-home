@@ -66,8 +66,8 @@ export function SelectionProvider({ children }: SelectionProviderProps) {
         const isCurrentlySelected = prev.selectedIds.has(folder.resource_id)
 
         // Filter children to only include direct children of this specific folder
-        const validChildren = children.filter((child) => 
-          child.parentId === folder.resource_id
+        const validChildren = children.filter(
+          (child) => child.parentId === folder.resource_id,
         )
 
         if (isCurrentlySelected) {
@@ -172,7 +172,9 @@ export function SelectionProvider({ children }: SelectionProviderProps) {
         }
 
         // Recursively check ancestors by finding the parent in selected items
-        const parentItem = allSelected.find(p => p.resource_id === currentItem.parentId)
+        const parentItem = allSelected.find(
+          (p) => p.resource_id === currentItem.parentId,
+        )
         if (parentItem) {
           return hasSelectedAncestor(parentItem)
         }
@@ -208,8 +210,8 @@ export function SelectionProvider({ children }: SelectionProviderProps) {
       }
 
       // Filter children to only include direct children of this specific folder
-      const validChildren = children.filter((child) => 
-        child.parentId === folder.resource_id
+      const validChildren = children.filter(
+        (child) => child.parentId === folder.resource_id,
       )
 
       // Check if any selected item is a direct or indirect descendant of this folder
@@ -217,18 +219,19 @@ export function SelectionProvider({ children }: SelectionProviderProps) {
         selectionState.selectedItems.values(),
       ).some((item) => {
         if (item.resource_id === folder.resource_id) return false
-        
+
         // Check if item is a direct child
         if (item.parentId === folder.resource_id) return true
-        
+
         // Check if item is an indirect descendant by finding its parent chain
         // This handles nested selections without path manipulation
         let currentItem = item
         while (currentItem.parentId) {
-          const parent = Array.from(selectionState.selectedItems.values())
-            .find(p => p.resource_id === currentItem.parentId)
+          const parent = Array.from(selectionState.selectedItems.values()).find(
+            (p) => p.resource_id === currentItem.parentId,
+          )
           if (!parent) break
-          
+
           if (parent.resource_id === folder.resource_id) return true
           currentItem = parent
         }

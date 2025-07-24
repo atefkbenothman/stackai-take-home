@@ -1,7 +1,7 @@
 "use server"
 
 import { getAuthToken } from "@/app/api/auth"
-import type { FilesResponse } from "@/lib/types"
+import type { FilesResponse, FileItem, RawFileFromAPI } from "@/lib/types"
 
 /*
  * Server-side function to get files from Stack AI API
@@ -61,10 +61,12 @@ export async function getFilesServer(
   const filesData = await filesResponse.json()
 
   // Set parentId for each file if we have a parent folder
-  const files = (filesData.data || []).map((file: any) => ({
-    ...file,
-    parentId: folderId, // Set parentId to the folder we're fetching from
-  }))
+  const files = (filesData.data || []).map(
+    (file: RawFileFromAPI): FileItem => ({
+      ...file,
+      parentId: folderId, // Set parentId to the folder we're fetching from
+    }),
+  )
 
   const response: FilesResponse = {
     files,

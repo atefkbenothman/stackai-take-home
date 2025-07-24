@@ -4,7 +4,14 @@ import { FileTreeHeader } from "@/components/file-tree/file-tree-header"
 export function FileTreeError() {
   return (
     <div className="rounded border bg-white shadow-sm">
-      <FileTreeHeader />
+      <FileTreeHeader
+        sortBy="name"
+        onSortChange={() => {}}
+        searchQuery=""
+        onSearchChange={() => {}}
+        filterExtension="all"
+        onFilterChange={() => {}}
+      />
       <div className="my-2 flex h-[500px] items-center justify-center overflow-y-auto">
         <div className="flex flex-col items-center justify-center space-y-4 p-8 text-center">
           <AlertCircle className="h-8 w-8 text-red-500" />
