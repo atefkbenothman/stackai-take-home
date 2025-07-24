@@ -21,37 +21,38 @@ interface SelectionProviderProps {
 
 export function SelectionProvider({ children }: SelectionProviderProps) {
   const [selectionState, setSelectionState] = useState<SelectionState>({
-    selectedIds: new Set<string>(),
     selectedItems: new Map<string, FileItem>(),
-    folderSelectionIntent: new Set<string>(),
   })
+
+  const selectedIds = useMemo(
+    () => new Set(selectionState.selectedItems.keys()),
+    [selectionState.selectedItems],
+  )
+
+  const selectedFolders = useMemo(
+    () =>
+      new Set(
+        [...selectionState.selectedItems.values()]
+          .filter((item) => item.inode_type === "directory")
+          .map((item) => item.resource_id),
+      ),
+    [selectionState.selectedItems],
+  )
 
   const toggleSelection = useCallback((item: FileItem) => {
     setSelectionState((prev) => {
-      const newSelectedIds = new Set(prev.selectedIds)
       const newSelectedItems = new Map(prev.selectedItems)
-      const newFolderSelectionIntent = new Set(prev.folderSelectionIntent)
 
-      if (prev.selectedIds.has(item.resource_id)) {
+      if (prev.selectedItems.has(item.resource_id)) {
         // Deselect item
-        newSelectedIds.delete(item.resource_id)
         newSelectedItems.delete(item.resource_id)
-        newFolderSelectionIntent.delete(item.resource_id)
       } else {
         // Select item
-        newSelectedIds.add(item.resource_id)
         newSelectedItems.set(item.resource_id, item)
-
-        // If it's a folder, mark it for selection intent
-        if (item.inode_type === "directory") {
-          newFolderSelectionIntent.add(item.resource_id)
-        }
       }
 
       return {
-        selectedIds: newSelectedIds,
         selectedItems: newSelectedItems,
-        folderSelectionIntent: newFolderSelectionIntent,
       }
     })
   }, [])
@@ -59,11 +60,9 @@ export function SelectionProvider({ children }: SelectionProviderProps) {
   const toggleFolderSelection = useCallback(
     (folder: FileItem, children: FileItem[] = []) => {
       setSelectionState((prev) => {
-        const newSelectedIds = new Set(prev.selectedIds)
         const newSelectedItems = new Map(prev.selectedItems)
-        const newFolderSelectionIntent = new Set(prev.folderSelectionIntent)
 
-        const isCurrentlySelected = prev.selectedIds.has(folder.resource_id)
+        const isCurrentlySelected = prev.selectedItems.has(folder.resource_id)
 
         // Filter children to only include direct children of this specific folder
         const validChildren = children.filter(
@@ -71,44 +70,25 @@ export function SelectionProvider({ children }: SelectionProviderProps) {
         )
 
         if (isCurrentlySelected) {
-          // Deselect folder and all valid children recursively
-          newSelectedIds.delete(folder.resource_id)
+          // Deselect folder and all valid children
           newSelectedItems.delete(folder.resource_id)
-          newFolderSelectionIntent.delete(folder.resource_id)
 
           // Recursively deselect all valid children
-          const deselectedChildren = (items: FileItem[]) => {
-            items.forEach((child) => {
-              newSelectedIds.delete(child.resource_id)
-              newSelectedItems.delete(child.resource_id)
-              newFolderSelectionIntent.delete(child.resource_id)
-            })
-          }
-          deselectedChildren(validChildren)
+          validChildren.forEach((child) => {
+            newSelectedItems.delete(child.resource_id)
+          })
         } else {
-          // Select folder and all valid children recursively
-          newSelectedIds.add(folder.resource_id)
+          // Select folder and all valid children
           newSelectedItems.set(folder.resource_id, folder)
-          newFolderSelectionIntent.add(folder.resource_id)
 
           // Recursively select all valid children
-          const selectChildren = (items: FileItem[]) => {
-            items.forEach((child) => {
-              newSelectedIds.add(child.resource_id)
-              newSelectedItems.set(child.resource_id, child)
-
-              if (child.inode_type === "directory") {
-                newFolderSelectionIntent.add(child.resource_id)
-              }
-            })
-          }
-          selectChildren(validChildren)
+          validChildren.forEach((child) => {
+            newSelectedItems.set(child.resource_id, child)
+          })
         }
 
         return {
-          selectedIds: newSelectedIds,
           selectedItems: newSelectedItems,
-          folderSelectionIntent: newFolderSelectionIntent,
         }
       })
     },
@@ -117,40 +97,29 @@ export function SelectionProvider({ children }: SelectionProviderProps) {
 
   const selectAll = useCallback((items: FileItem[]) => {
     setSelectionState((prev) => {
-      const newSelectedIds = new Set(prev.selectedIds)
       const newSelectedItems = new Map(prev.selectedItems)
-      const newFolderSelectionIntent = new Set(prev.folderSelectionIntent)
 
       items.forEach((item) => {
-        newSelectedIds.add(item.resource_id)
         newSelectedItems.set(item.resource_id, item)
-
-        if (item.inode_type === "directory") {
-          newFolderSelectionIntent.add(item.resource_id)
-        }
       })
 
       return {
-        selectedIds: newSelectedIds,
         selectedItems: newSelectedItems,
-        folderSelectionIntent: newFolderSelectionIntent,
       }
     })
   }, [])
 
   const clearSelection = useCallback(() => {
     setSelectionState({
-      selectedIds: new Set<string>(),
       selectedItems: new Map<string, FileItem>(),
-      folderSelectionIntent: new Set<string>(),
     })
   }, [])
 
   const isSelected = useCallback(
     (itemId: string) => {
-      return selectionState.selectedIds.has(itemId)
+      return selectedIds.has(itemId)
     },
-    [selectionState.selectedIds],
+    [selectedIds],
   )
 
   const getSelectedItems = useCallback(() => {
@@ -167,7 +136,7 @@ export function SelectionProvider({ children }: SelectionProviderProps) {
         if (!currentItem.parentId) return false
 
         // Check if direct parent is selected
-        if (selectionState.selectedIds.has(currentItem.parentId)) {
+        if (selectedIds.has(currentItem.parentId)) {
           return true
         }
 
@@ -184,7 +153,7 @@ export function SelectionProvider({ children }: SelectionProviderProps) {
 
       return !hasSelectedAncestor(item)
     })
-  }, [selectionState.selectedItems, selectionState.selectedIds])
+  }, [selectionState.selectedItems, selectedIds])
 
   const getSelectionSummary = useMemo(() => {
     const items = Array.from(selectionState.selectedItems.values())
@@ -199,13 +168,17 @@ export function SelectionProvider({ children }: SelectionProviderProps) {
     }
   }, [selectionState.selectedItems])
 
+  const getSelectionSummaryFn = useCallback(() => {
+    return getSelectionSummary
+  }, [getSelectionSummary])
+
   const isIndeterminate = useCallback(
     (folder: FileItem, children: FileItem[] = []) => {
       if (folder.inode_type !== "directory") {
         return false // Not a folder
       }
 
-      if (selectionState.selectedIds.has(folder.resource_id)) {
+      if (selectedIds.has(folder.resource_id)) {
         return false // Fully selected, not indeterminate
       }
 
@@ -246,7 +219,7 @@ export function SelectionProvider({ children }: SelectionProviderProps) {
       // If we have children data, check if all direct children are selected
       if (validChildren.length > 0) {
         const allDirectChildrenSelected = validChildren.every((child) =>
-          selectionState.selectedIds.has(child.resource_id),
+          selectedIds.has(child.resource_id),
         )
         return !allDirectChildrenSelected // Indeterminate if not all direct children selected
       }
@@ -254,12 +227,14 @@ export function SelectionProvider({ children }: SelectionProviderProps) {
       // No children data (collapsed), but has descendants selected
       return true
     },
-    [selectionState.selectedIds, selectionState.selectedItems],
+    [selectedIds, selectionState.selectedItems],
   )
 
   const contextValue: SelectionContextType = useMemo(
     () => ({
       ...selectionState,
+      selectedIds, // Add computed selectedIds for backward compatibility
+      folderSelectionIntent: selectedFolders, // Add computed folderSelectionIntent
       toggleSelection,
       toggleFolderSelection,
       selectAll,
@@ -268,10 +243,12 @@ export function SelectionProvider({ children }: SelectionProviderProps) {
       isIndeterminate,
       getSelectedItems,
       getMinimalSelectedItems,
-      getSelectionSummary: () => getSelectionSummary,
+      getSelectionSummary: getSelectionSummaryFn,
     }),
     [
       selectionState,
+      selectedIds,
+      selectedFolders,
       toggleSelection,
       toggleFolderSelection,
       selectAll,
@@ -280,7 +257,7 @@ export function SelectionProvider({ children }: SelectionProviderProps) {
       isIndeterminate,
       getSelectedItems,
       getMinimalSelectedItems,
-      getSelectionSummary,
+      getSelectionSummaryFn,
     ],
   )
 

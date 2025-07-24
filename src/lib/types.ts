@@ -1,4 +1,3 @@
-// Indexing status for files
 export type IndexingStatus =
   | "not-indexed"
   | "pending"
@@ -6,7 +5,6 @@ export type IndexingStatus =
   | "indexed"
   | "error"
 
-// Raw file from API
 export interface RawFileFromAPI {
   resource_id: string
   inode_type: "directory" | "file"
@@ -30,17 +28,16 @@ export interface FileItem {
   }
   created_at: string
   modified_at: string
-  parentId?: string // Parent folder's resource_id, undefined for root items
+  parentId?: string
   dataloader_metadata?: {
     size?: number
     content_mime?: string
     web_url?: string
   }
-  // Knowledge Base related fields
   indexingStatus?: IndexingStatus
-  kbResourceId?: string // ID if file is in a knowledge base
-  indexingError?: string // Error message if indexing failed
-  lastIndexedAt?: string // Timestamp of last successful indexing
+  kbResourceId?: string
+  indexingError?: string
+  lastIndexedAt?: string
 }
 
 export interface FilesResponse {
@@ -49,11 +46,10 @@ export interface FilesResponse {
   org_id: string
 }
 
-// Selection-related types
 export interface SelectionState {
-  selectedIds: Set<string>
   selectedItems: Map<string, FileItem>
-  folderSelectionIntent: Set<string> // Folders marked as "selected" but not expanded yet
+  selectedIds?: Set<string>
+  folderSelectionIntent?: Set<string>
 }
 
 export interface SelectionActions {
@@ -75,7 +71,6 @@ export interface SelectionContextType
   extends SelectionState,
     SelectionActions {}
 
-// Knowledge Base types
 export interface KnowledgeBase {
   knowledge_base_id: string
   name: string
@@ -86,7 +81,6 @@ export interface KnowledgeBase {
   org_id: string
 }
 
-// Request to create a Knowledge Base
 export interface CreateKnowledgeBaseRequest {
   connection_id: string
   connection_source_ids: string[]
@@ -109,7 +103,6 @@ export interface CreateKnowledgeBaseRequest {
   cron_job_id: null
 }
 
-// Knowledge Base resource (file/folder in KB)
 export interface KBResource {
   resource_id: string
   inode_type: "file" | "directory"
@@ -119,12 +112,10 @@ export interface KBResource {
   updated_at?: string
 }
 
-// Response from KB status endpoint
 export interface KBStatusResponse {
   data: KBResource[]
 }
 
-// Indexing operation tracking
 export interface IndexingOperation {
   knowledgeBaseId: string
   startedAt: string
