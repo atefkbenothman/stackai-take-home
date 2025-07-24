@@ -1,4 +1,6 @@
-import { useState, useCallback, useEffect, useMemo } from "react"
+"use client"
+
+import { useState, useCallback, useEffect } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
 import type { FileItem, FilesResponse } from "@/lib/types"
@@ -15,18 +17,9 @@ interface UseFolderOperationsReturn {
 
 export function useFolderOperations(item: FileItem): UseFolderOperationsReturn {
   const [isExpanded, setIsExpanded] = useState(false)
+
   const queryClient = useQueryClient()
   const isFolder = item.inode_type === "directory"
-
-  const queryKey = useMemo(
-    () => ["files", item.resource_id],
-    [item.resource_id],
-  )
-  const queryFn = useCallback(
-    () => getFiles(item.resource_id),
-    [item.resource_id],
-  )
-  const staleTime = 5 * 60 * 1000
 
   // Fetch folder data when expanded
   const {
@@ -34,10 +27,10 @@ export function useFolderOperations(item: FileItem): UseFolderOperationsReturn {
     isLoading,
     error,
   } = useQuery<FilesResponse, Error>({
-    queryKey,
-    queryFn,
+    queryKey: ["files", item.resource_id],
+    queryFn: () => getFiles(item.resource_id),
     enabled: isFolder && isExpanded,
-    staleTime,
+    staleTime: 5 * 60 * 1000,
     retry: 2,
   })
 
@@ -49,39 +42,30 @@ export function useFolderOperations(item: FileItem): UseFolderOperationsReturn {
   // Prefetch folder data on hover
   const prefetch = useCallback(() => {
     if (!isFolder || isExpanded) return
-
     queryClient
       .prefetchQuery({
-        queryKey,
-        queryFn,
-        staleTime,
+        queryKey: ["files", item.resource_id],
+        queryFn: () => getFiles(item.resource_id),
+        staleTime: 5 * 60 * 1000,
       })
       .catch((error) => {
         console.debug("Prefetch failed for folder:", item.resource_id, error)
       })
-  }, [
-    isFolder,
-    isExpanded,
-    queryClient,
-    item.resource_id,
-    queryKey,
-    queryFn,
-    staleTime,
-  ])
+  }, [isFolder, isExpanded, queryClient, item.resource_id])
 
   // Show toast notification for errors
   useEffect(() => {
     if (error) {
       toast.error(`Failed to load folder: ${item.inode_path.path}`)
     }
-  }, [error, item.inode_path.path, queryClient, queryKey])
+  }, [error, item.inode_path.path, queryClient])
 
   return {
     isExpanded,
-    toggleExpansion,
     folderData,
     isLoading,
     error,
+    toggleExpansion,
     prefetch,
   }
 }
