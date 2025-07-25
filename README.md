@@ -2,9 +2,9 @@
 
 [**View Live Demo**](https://stackai-take-home-kai.vercel.app)
 
-## 📹 Demo Video
+## Demo Video
 
-[Screen recording]
+[**Screen recording**](https://drive.google.com/file/d/1yDzCjVGGF29e7iunKY1jSPa15mD7p_LW/view?usp=sharing)
 
 ## ️Local Development Setup
 
