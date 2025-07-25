@@ -11,6 +11,7 @@ import type {
 import {
   mapKBStatusToIndexingStatus,
   updateFileIndexingStatus,
+  getParentFolderPath,
 } from "@/lib/utils"
 
 export function useFileStatus(
@@ -18,26 +19,40 @@ export function useFileStatus(
 ): UseFileStatusReturn {
   const queryClient = useQueryClient()
 
-  // Status polling query - simple root query like the notebook approach
+  // Status polling query - queries parent folders and filters for selected files
   const { data: kbStatusData, isLoading: isPollingQuery } = useQuery({
     queryKey: ["kb-status", activeIndexing?.knowledgeBaseId],
     queryFn: async () => {
       if (!activeIndexing?.knowledgeBaseId) return null
 
-      // Simple root query approach (like the notebook)
-      const rootStatus = await getKnowledgeBaseStatus(
-        activeIndexing.knowledgeBaseId,
-        "/",
-      )
+      // Group files by parent folder paths and query each folder
+      const allResults: KBResource[] = []
+      
+      // Get unique parent folder paths
+      const parentFolders = new Set<string>()
+      activeIndexing.selectedFiles.forEach(file => {
+        const parentPath = getParentFolderPath(file.inode_path.path)
+        parentFolders.add(parentPath)
+      })
 
-      // Filter to only include resources that match our originally selected files
-      // This prevents unselected child files from polluting our status tracking
-      const selectedPaths = new Set(
-        activeIndexing.selectedFiles.map((f) => f.inode_path.path),
-      )
+      // Query each parent folder
+      for (const folderPath of parentFolders) {
+        try {
+          const folderStatus = await getKnowledgeBaseStatus(
+            activeIndexing.knowledgeBaseId,
+            folderPath  // Query parent folder path
+          )
+          allResults.push(...folderStatus.data)
+        } catch (error) {
+          console.warn(`Failed to get status for folder ${folderPath}:`, error)
+          // Continue with other folders even if one fails
+        }
+      }
 
-      const filteredResults = rootStatus.data.filter((kbResource) =>
-        selectedPaths.has(kbResource.inode_path.path),
+      // Filter results to only include files we actually selected
+      const selectedPaths = new Set(activeIndexing.selectedFiles.map(f => f.inode_path.path))
+      const filteredResults = allResults.filter(kbResource => 
+        selectedPaths.has(kbResource.inode_path.path)
       )
 
       return { data: filteredResults }
@@ -147,11 +162,53 @@ export function useFileStatus(
     return completed
   }, [activeIndexing, statusMap, statusValues])
 
+  // Check if all files are successfully indexed (only "indexed" status, not "error")
+  const allFilesSuccessful = useMemo(() => {
+    if (!activeIndexing || statusMap.size === 0) return false
+
+    const successful = activeIndexing.selectedFiles.every((file) => {
+      // First try exact resource ID match (works for files)
+      let kbResource = statusMap.get(file.resource_id)
+
+      // If no exact match and it's a directory, try path-based matching
+      if (!kbResource && file.inode_type === "directory") {
+        kbResource = statusValues.find(
+          (kb: KBResource) => kb.inode_path.path === file.inode_path.path,
+        )
+      }
+
+      // If still no match, try path-based matching for files too (resource IDs might differ)
+      if (!kbResource) {
+        kbResource = statusValues.find(
+          (kb: KBResource) => kb.inode_path.path === file.inode_path.path,
+        )
+      }
+
+      if (!kbResource) {
+        return false
+      }
+
+      // For virtual directories, undefined status means successfully indexed
+      if (
+        file.inode_type === "directory" &&
+        kbResource.resource_id === "STACK_VFS_VIRTUAL_DIRECTORY"
+      ) {
+        return true // Virtual directories are considered successful when they appear
+      }
+
+      // For regular files, only "indexed" status is successful (not "error")
+      return kbResource.status === "indexed"
+    })
+
+    return successful
+  }, [activeIndexing, statusMap, statusValues])
+
   const isPolling = isPollingQuery && !!activeIndexing
 
   return {
     isPolling,
     updateFileStatus: updateFileIndexingStatus,
     allFilesCompleted,
+    allFilesSuccessful,
   }
 }

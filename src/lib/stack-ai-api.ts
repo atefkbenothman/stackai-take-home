@@ -211,4 +211,3 @@ export async function deleteFromKnowledgeBase(
     throw new Error(`Failed to delete resource: ${error}`)
   }
 }
-

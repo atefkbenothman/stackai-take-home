@@ -42,6 +42,14 @@ export function mapKBStatusToIndexingStatus(
   }
 }
 
+export function getParentFolderPath(filePath: string): string {
+  const lastSlashIndex = filePath.lastIndexOf("/")
+  if (lastSlashIndex === -1) {
+    return "/"
+  }
+  return filePath.substring(0, lastSlashIndex)
+}
+
 export function updateFileIndexingStatus(
   queryClient: QueryClient,
   resourceId: string,

@@ -1,15 +1,14 @@
 "use client"
 
-import { useMutation, useQueryClient } from "@tanstack/react-query"
+import { useMutation, useQueryClient, QueryClient } from "@tanstack/react-query"
 import { useState, useEffect, useCallback } from "react"
 import { toast } from "sonner"
 import {
   createKnowledgeBase,
-  fetchFiles,
   triggerKnowledgeBaseSync,
   deleteFromKnowledgeBase,
 } from "@/lib/stack-ai-api"
-import type { FileItem, ActiveIndexing } from "@/lib/types"
+import type { FileItem, ActiveIndexing, FilesResponse } from "@/lib/types"
 import { useFileStatus } from "@/hooks/use-file-status"
 
 
@@ -24,12 +23,14 @@ interface UseFileIndexingReturn {
   activeIndexing: ActiveIndexing | null
 }
 
-async function indexFilesAPI(selectedItems: FileItem[]) {
-  const filesData = await fetchFiles()
-  const connectionId = filesData.connection_id
+async function indexFilesAPI(selectedItems: FileItem[], queryClient: QueryClient) {
+  // Extract connection metadata from existing TanStack Query cache
+  const rootData = queryClient.getQueryData<FilesResponse>(["files"])
+  const connectionId = rootData?.connection_id
+  const orgId = rootData?.org_id
 
-  if (!connectionId) {
-    throw new Error("Could not determine connection ID for KB creation")
+  if (!connectionId || !orgId) {
+    throw new Error("Connection metadata not available. Please refresh the page.")
   }
 
   // Extract resource IDs
@@ -94,12 +95,12 @@ export function useFileIndexing(): UseFileIndexingReturn {
   )
 
   // Use the file status hook for status monitoring
-  const { isPolling, updateFileStatus, allFilesCompleted } =
+  const { isPolling, updateFileStatus, allFilesCompleted, allFilesSuccessful } =
     useFileStatus(activeIndexing)
 
   // Knowledge Base indexing mutation
   const mutation = useMutation({
-    mutationFn: indexFilesAPI,
+    mutationFn: (selectedItems: FileItem[]) => indexFilesAPI(selectedItems, queryClient),
     onMutate: async (selectedItems: FileItem[]) => {
       if (selectedItems.length === 0) {
         toast.error("No files selected for indexing")
@@ -130,8 +131,6 @@ export function useFileIndexing(): UseFileIndexingReturn {
     onSuccess: (data) => {
       const { knowledgeBaseId, selectedItems } = data
 
-      // Log KB ID for manual saving
-      console.log("KNOWLEDGE BASE ID:", knowledgeBaseId)
 
       // Immediately set files to "indexing" status since KB creation succeeded
       selectedItems.forEach((item) => {
@@ -175,13 +174,18 @@ export function useFileIndexing(): UseFileIndexingReturn {
     },
   })
 
-  // Stop polling when all files are completed
+  // Stop polling when all files are completed and show appropriate toast
   useEffect(() => {
     if (allFilesCompleted && activeIndexing) {
       setActiveIndexing(null)
-      toast.success("Indexing completed!")
+      
+      if (allFilesSuccessful) {
+        toast.success("Indexing completed!")
+      } else {
+        toast.error("Some files failed to index")
+      }
     }
-  }, [allFilesCompleted, activeIndexing])
+  }, [allFilesCompleted, allFilesSuccessful, activeIndexing])
 
   useEffect(() => {
     if (!activeIndexing) return

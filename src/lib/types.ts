@@ -110,4 +110,5 @@ export interface UseFileStatusReturn {
     file?: FileItem,
   ) => void
   allFilesCompleted: boolean
+  allFilesSuccessful: boolean
 }
