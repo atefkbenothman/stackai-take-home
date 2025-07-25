@@ -129,9 +129,11 @@ function FileTreeItemComponent({
         </div>
 
         {/* Indexing status indicator */}
-        <div className="ml-2 flex items-center">
-          <StatusBadge status={item.indexingStatus || "not-indexed"} />
-        </div>
+        {item.indexingStatus && item.indexingStatus !== "not-indexed" && (
+          <div className="ml-2 flex items-center">
+            <StatusBadge status={item.indexingStatus} />
+          </div>
+        )}
 
         {/* Last modified date */}
         {item.modified_at && (

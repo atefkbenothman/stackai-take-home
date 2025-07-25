@@ -1,3 +1,5 @@
+import type { QueryClient } from "@tanstack/react-query"
+
 export type IndexingStatus =
   | "not-indexed"
   | "pending"
@@ -89,4 +91,23 @@ export interface KBResource {
 
 export interface KBStatusResponse {
   data: KBResource[]
+}
+
+export interface ActiveIndexing {
+  knowledgeBaseId: string
+  selectedFiles: FileItem[]
+  startTime: number
+}
+
+export interface UseFileStatusReturn {
+  isPolling: boolean
+  updateFileStatus: (
+    queryClient: QueryClient,
+    resourceId: string,
+    status: IndexingStatus,
+    error?: string,
+    knowledgeBaseId?: string,
+    file?: FileItem,
+  ) => void
+  allFilesCompleted: boolean
 }
