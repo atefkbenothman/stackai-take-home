@@ -1,7 +1,7 @@
 "use client"
 
 import { useMutation, useQueryClient } from "@tanstack/react-query"
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect } from "react"
 import { toast } from "sonner"
 import {
   createKnowledgeBase,
@@ -10,12 +10,12 @@ import {
 } from "@/lib/stack-ai-api"
 import type { FileItem, ActiveIndexing, FilesResponse } from "@/lib/types"
 import { useFileStatus } from "./use-file-status"
+import { getAllCachedDescendants } from "@/lib/utils"
 
 interface UseFileIndexingReturn {
   indexFiles: (selectedItems: FileItem[]) => void
   deindexFile: (file: FileItem) => void
   batchDeindexFiles: (selectedItems: FileItem[]) => void
-  cancelIndexing: () => void
   isIndexing: boolean
   isPolling: boolean
   isActive: boolean
@@ -28,32 +28,58 @@ export function useFileIndexing(): UseFileIndexingReturn {
     null,
   )
 
+  const separateFilesByType = (files: FileItem[]) => ({
+    files: files.filter((f) => f.inode_type === "file"),
+    folders: files.filter((f) => f.inode_type === "directory"),
+  })
+
   const { isPolling, allFilesCompleted, allFilesSuccessful } =
     useFileStatus(activeIndexing)
 
-  // Update files in cache
-  const updateFilesInCache = useCallback(
-    (files: FileItem[], updateFn: (file: FileItem) => Partial<FileItem>) => {
-      files.forEach((file) => {
-        const targetQuery = file.parentId ? ["files", file.parentId] : ["files"]
-        queryClient.setQueryData(
-          targetQuery,
-          (oldData: FilesResponse | undefined) => {
-            if (!oldData) return oldData
-            return {
-              ...oldData,
-              files: oldData.files.map((f) =>
-                f.resource_id === file.resource_id
-                  ? { ...f, ...updateFn(file) }
-                  : f,
-              ),
-            }
-          },
+  const updateFilesInCache = (
+    files: FileItem[],
+    updateFn: (file: FileItem) => Partial<FileItem>,
+  ) => {
+    files.forEach((file) => {
+      const targetQuery = file.parentId ? ["files", file.parentId] : ["files"]
+      queryClient.setQueryData(
+        targetQuery,
+        (oldData: FilesResponse | undefined) => {
+          if (!oldData) return oldData
+          return {
+            ...oldData,
+            files: oldData.files.map((f) =>
+              f.resource_id === file.resource_id
+                ? { ...f, ...updateFn(file) }
+                : f,
+            ),
+          }
+        },
+      )
+    })
+  }
+
+  // Enhanced update function that also updates cached descendants of folders
+  const updateFilesAndDescendantsInCache = (
+    selectedItems: FileItem[],
+    updateFn: (file: FileItem) => Partial<FileItem>,
+  ) => {
+    // First, update the selected items themselves
+    updateFilesInCache(selectedItems, updateFn)
+
+    // Then, find and update all cached descendants of selected folders
+    selectedItems.forEach((item) => {
+      if (item.inode_type === "directory") {
+        const descendants = getAllCachedDescendants(
+          item.resource_id,
+          queryClient,
         )
-      })
-    },
-    [queryClient],
-  )
+        if (descendants.length > 0) {
+          updateFilesInCache(descendants, updateFn)
+        }
+      }
+    })
+  }
 
   // Index files mutation
   const indexMutation = useMutation({
@@ -89,8 +115,8 @@ export function useFileIndexing(): UseFileIndexingReturn {
         throw new Error("Indexing already in progress")
       }
 
-      // Set all files to pending
-      updateFilesInCache(selectedItems, () => ({
+      // Set all files and their descendants to pending
+      updateFilesAndDescendantsInCache(selectedItems, () => ({
         indexingStatus: "pending" as const,
       }))
 
@@ -100,8 +126,8 @@ export function useFileIndexing(): UseFileIndexingReturn {
     onSuccess: (data) => {
       const { knowledgeBaseId, selectedItems } = data
 
-      // Update files to indexing status
-      updateFilesInCache(selectedItems, () => ({
+      // Update files and their descendants to indexing status
+      updateFilesAndDescendantsInCache(selectedItems, () => ({
         indexingStatus: "indexing" as const,
         kbResourceId: knowledgeBaseId,
       }))
@@ -121,8 +147,8 @@ export function useFileIndexing(): UseFileIndexingReturn {
       const errorMessage =
         error instanceof Error ? error.message : "Unknown error"
 
-      // Set files to error status
-      updateFilesInCache(selectedItems, () => ({
+      // Set files and their descendants to error status
+      updateFilesAndDescendantsInCache(selectedItems, () => ({
         indexingStatus: "error" as const,
         indexingError: errorMessage,
       }))
@@ -177,20 +203,18 @@ export function useFileIndexing(): UseFileIndexingReturn {
   const batchDeindexMutation = useMutation({
     mutationFn: async (selectedItems: FileItem[]) => {
       // Filter to only indexed files that have KB resource IDs
-      const indexedFiles = selectedItems.filter(
-        (item) =>
-          item.inode_type === "file" &&
-          item.indexingStatus === "indexed" &&
-          item.kbResourceId,
+      const { files: indexedFiles } = separateFilesByType(selectedItems)
+      const filtered = indexedFiles.filter(
+        (item) => item.indexingStatus === "indexed" && item.kbResourceId,
       )
 
-      if (indexedFiles.length === 0) {
+      if (filtered.length === 0) {
         throw new Error("No indexed files found in selection")
       }
 
       // De-index each file from its respective Knowledge Base
       const results = await Promise.allSettled(
-        indexedFiles.map(async (file) => {
+        filtered.map(async (file) => {
           await deleteFromKnowledgeBase(
             file.kbResourceId!,
             file.inode_path.path,
@@ -206,28 +230,29 @@ export function useFileIndexing(): UseFileIndexingReturn {
         throw new Error(`Failed to de-index some files: ${firstError.message}`)
       }
 
-      return { selectedItems: indexedFiles }
+      return { selectedItems: filtered }
     },
     onMutate: async (selectedItems: FileItem[]) => {
-      const indexedFiles = selectedItems.filter(
+      const { files: indexedFiles } = separateFilesByType(selectedItems)
+      const filtered = indexedFiles.filter(
         (item) => item.indexingStatus === "indexed" && item.kbResourceId,
       )
 
-      if (indexedFiles.length === 0) {
+      if (filtered.length === 0) {
         toast.error("No indexed files found in selection")
         throw new Error("No indexed files to de-index")
       }
 
       // Optimistic update
-      updateFilesInCache(indexedFiles, () => ({
+      updateFilesInCache(filtered, () => ({
         indexingStatus: "not-indexed" as const,
         kbResourceId: undefined,
       }))
 
       toast.info(
-        `Removing ${indexedFiles.length} file${indexedFiles.length !== 1 ? "s" : ""} from knowledge base...`,
+        `Removing ${filtered.length} file${filtered.length !== 1 ? "s" : ""} from knowledge base...`,
       )
-      return { indexedFiles }
+      return { indexedFiles: filtered }
     },
     onSuccess: ({ selectedItems }) => {
       toast.success(
@@ -287,26 +312,10 @@ export function useFileIndexing(): UseFileIndexingReturn {
     return () => clearTimeout(timeoutId)
   }, [activeIndexing])
 
-  const cancelIndexing = useCallback(() => {
-    if (activeIndexing) {
-      // Reset files to not-indexed
-      updateFilesInCache(activeIndexing.selectedFiles, () => ({
-        indexingStatus: "not-indexed" as const,
-        kbResourceId: undefined,
-      }))
-
-      setActiveIndexing(null)
-      toast.info(
-        "Stopped monitoring indexing. Operations may continue in background.",
-      )
-    }
-  }, [activeIndexing, updateFilesInCache])
-
   return {
     indexFiles: indexMutation.mutate,
     deindexFile: deindexMutation.mutate,
     batchDeindexFiles: batchDeindexMutation.mutate,
-    cancelIndexing,
     isIndexing:
       indexMutation.isPending ||
       deindexMutation.isPending ||

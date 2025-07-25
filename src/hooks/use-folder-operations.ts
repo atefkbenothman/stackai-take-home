@@ -4,6 +4,7 @@ import { useState, useCallback, useEffect } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
 import { fetchFiles } from "@/lib/stack-ai-api"
+import { useSelectionStore } from "@/stores/selection-store"
 import type { FileItem, FilesResponse } from "@/lib/types"
 
 interface UseFolderOperationsReturn {
@@ -20,6 +21,9 @@ export function useFolderOperations(item: FileItem): UseFolderOperationsReturn {
 
   const queryClient = useQueryClient()
   const isFolder = item.inode_type === "directory"
+  const autoSelectNewlyFetchedChildren = useSelectionStore(
+    (state) => state.autoSelectNewlyFetchedChildren
+  )
 
   // Fetch folder data when expanded
   const {
@@ -54,7 +58,14 @@ export function useFolderOperations(item: FileItem): UseFolderOperationsReturn {
     if (error) {
       toast.error(`Failed to load folder: ${item.inode_path.path}`)
     }
-  }, [error, item.inode_path.path, queryClient])
+  }, [error, item.inode_path.path])
+
+  // Auto-select newly fetched children if folder was marked for auto-selection
+  useEffect(() => {
+    if (folderData && isFolder) {
+      autoSelectNewlyFetchedChildren(item.resource_id, queryClient)
+    }
+  }, [folderData, isFolder, item.resource_id, autoSelectNewlyFetchedChildren, queryClient])
 
   return {
     isExpanded,

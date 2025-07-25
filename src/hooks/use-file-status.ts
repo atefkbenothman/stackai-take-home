@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useEffect } from "react"
+import { useMemo, useEffect, useCallback } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { getKnowledgeBaseStatus } from "@/lib/stack-ai-api"
 import type {
@@ -10,11 +10,70 @@ import type {
   FilesResponse,
   FileItem,
 } from "@/lib/types"
+import { getAllCachedDescendants } from "@/lib/utils"
 
 export function useFileStatus(
   activeIndexing: ActiveIndexing | null,
 ): UseFileStatusReturn {
   const queryClient = useQueryClient()
+
+  // Recursive status update function
+  const updateFileAndDescendantsStatus = useCallback((
+    file: FileItem,
+    status: "indexed" | "error" | "indexing",
+    knowledgeBaseId: string
+  ) => {
+    // Update the file itself
+    const targetQuery = file.parentId ? ["files", file.parentId] : ["files"]
+    queryClient.setQueryData(
+      targetQuery,
+      (oldData: FilesResponse | undefined) => {
+        if (!oldData) return oldData
+        return {
+          ...oldData,
+          files: oldData.files.map((f) =>
+            f.resource_id === file.resource_id
+              ? {
+                  ...f,
+                  indexingStatus: status,
+                  kbResourceId: knowledgeBaseId,
+                  lastIndexedAt: new Date().toISOString(),
+                }
+              : f,
+          ),
+        }
+      },
+    )
+
+    // If it's a folder, also update all its cached descendants
+    if (file.inode_type === "directory") {
+      const descendants = getAllCachedDescendants(file.resource_id, queryClient)
+      descendants.forEach((descendant) => {
+        const descendantQuery = descendant.parentId 
+          ? ["files", descendant.parentId] 
+          : ["files"]
+        queryClient.setQueryData(
+          descendantQuery,
+          (oldData: FilesResponse | undefined) => {
+            if (!oldData) return oldData
+            return {
+              ...oldData,
+              files: oldData.files.map((f) =>
+                f.resource_id === descendant.resource_id
+                  ? {
+                      ...f,
+                      indexingStatus: status,
+                      kbResourceId: knowledgeBaseId,
+                      lastIndexedAt: new Date().toISOString(),
+                    }
+                  : f,
+              ),
+            }
+          },
+        )
+      })
+    }
+  }, [queryClient])
 
   const mapKBStatus = (status?: string): "indexed" | "error" | "indexing" => {
     return status === "indexed"
@@ -26,6 +85,30 @@ export function useFileStatus(
 
   const createExistingFilesMap = (files: FileItem[]): Map<string, FileItem> => {
     return new Map(files.map((f) => [f.resource_id, f]))
+  }
+
+  const getParentPath = (filePath: string): string => {
+    return filePath.substring(0, filePath.lastIndexOf("/")) || "/"
+  }
+
+  const separateFilesByType = (files: FileItem[]) => ({
+    files: files.filter((f) => f.inode_type === "file"),
+    folders: files.filter((f) => f.inode_type === "directory"),
+  })
+
+  const findKBResourceByPath = (
+    resources: KBResource[],
+    filePath: string,
+  ): KBResource | undefined => {
+    return resources.find((r) => r.inode_path.path === filePath)
+  }
+
+  const getUniqueParentPaths = (files: FileItem[]): Set<string> => {
+    const parentPaths = new Set<string>()
+    files.forEach((file) => {
+      parentPaths.add(getParentPath(file.inode_path.path))
+    })
+    return parentPaths
   }
 
   // Process KB resource into FileItem (update existing or create new)
@@ -110,23 +193,15 @@ export function useFileStatus(
       const allResults: KBResource[] = []
 
       // STEP 1: Handle individual files - query their parent folders
-      const individualFiles = selectedFiles.filter(
-        (f) => f.inode_type === "file",
-      )
+      const { files: individualFiles, folders: selectedFolders } =
+        separateFilesByType(selectedFiles)
+
       if (individualFiles.length > 0) {
         // Get unique parent folders to avoid duplicate API calls
-        const parentFolders = new Set<string>()
-        individualFiles.forEach((file) => {
-          const parentPath =
-            file.inode_path.path.substring(
-              0,
-              file.inode_path.path.lastIndexOf("/"),
-            ) || "/"
-          parentFolders.add(parentPath)
-        })
+        const parentPaths = getUniqueParentPaths(individualFiles)
 
         // Query each parent folder
-        for (const folderPath of parentFolders) {
+        for (const folderPath of parentPaths) {
           try {
             const folderStatus = await getKnowledgeBaseStatus(
               knowledgeBaseId,
@@ -143,9 +218,6 @@ export function useFileStatus(
       }
 
       // STEP 2: Handle selected folders - query their contents and create synthetic status
-      const selectedFolders = selectedFiles.filter(
-        (f) => f.inode_type === "directory",
-      )
       for (const folder of selectedFolders) {
         try {
           const folderContents = await getKnowledgeBaseStatus(
@@ -195,43 +267,25 @@ export function useFileStatus(
     retry: 2,
   })
 
-  // Update individual file status in cache
+  // Update individual file status in cache (with recursive updates for folders)
   useEffect(() => {
     if (!activeIndexing || !kbStatusData?.data) return
 
     activeIndexing.selectedFiles.forEach((file) => {
       // Find status by path (handles resource ID changes)
-      const kbResource = kbStatusData.data.find(
-        (r) => r.inode_path.path === file.inode_path.path,
+      const kbResource = findKBResourceByPath(
+        kbStatusData.data,
+        file.inode_path.path,
       )
 
       if (kbResource) {
         const status = mapKBStatus(kbResource.status)
 
-        // Update the file in cache
-        const targetQuery = file.parentId ? ["files", file.parentId] : ["files"]
-        queryClient.setQueryData(
-          targetQuery,
-          (oldData: FilesResponse | undefined) => {
-            if (!oldData) return oldData
-            return {
-              ...oldData,
-              files: oldData.files.map((f) =>
-                f.resource_id === file.resource_id
-                  ? {
-                      ...f,
-                      indexingStatus: status,
-                      kbResourceId: activeIndexing.knowledgeBaseId,
-                      lastIndexedAt: new Date().toISOString(),
-                    }
-                  : f,
-              ),
-            }
-          },
-        )
+        // Use recursive update function to update file and its descendants
+        updateFileAndDescendantsStatus(file, status, activeIndexing.knowledgeBaseId)
       }
     })
-  }, [activeIndexing, kbStatusData, queryClient])
+  }, [activeIndexing, kbStatusData, queryClient, updateFileAndDescendantsStatus])
 
   // Check if all files completed
   const { allFilesCompleted, allFilesSuccessful } = useMemo(() => {
@@ -243,8 +297,9 @@ export function useFileStatus(
     let successful = true
 
     for (const file of activeIndexing.selectedFiles) {
-      const kbResource = kbStatusData.data.find(
-        (r) => r.inode_path.path === file.inode_path.path,
+      const kbResource = findKBResourceByPath(
+        kbStatusData.data,
+        file.inode_path.path,
       )
 
       if (!kbResource) {

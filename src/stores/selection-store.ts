@@ -1,11 +1,82 @@
 import { create } from "zustand"
-import type { FileItem } from "@/lib/types"
+import type { QueryClient } from "@tanstack/react-query"
+import type { FileItem, FilesResponse } from "@/lib/types"
+
+/**
+ * Gets all FileItems from React Query cache by searching all "files" query keys
+ */
+function getAllCachedItems(queryClient: QueryClient): FileItem[] {
+  const queryCache = queryClient.getQueryCache()
+  const allItems: FileItem[] = []
+
+  // Find all queries with keys starting with ["files"]
+  queryCache.findAll({ queryKey: ["files"] }).forEach((query) => {
+    const data = query.state.data as FilesResponse | undefined
+    if (data?.files) {
+      allItems.push(...data.files)
+    }
+  })
+
+  return allItems
+}
+
+/**
+ * Checks if a given item is a descendant of the specified ancestor by walking the parentId chain
+ */
+function isDescendantOf(
+  childItem: FileItem,
+  ancestorId: string,
+  allItems: FileItem[]
+): boolean {
+  let currentItem = childItem
+  const visited = new Set<string>() // Prevent infinite loops
+
+  // Walk up the parent chain
+  while (currentItem.parentId && !visited.has(currentItem.resource_id)) {
+    visited.add(currentItem.resource_id)
+    
+    if (currentItem.parentId === ancestorId) {
+      return true // Direct or indirect descendant found
+    }
+
+    // Find the parent item and continue walking up
+    const parentItem = allItems.find(
+      (item) => item.resource_id === currentItem.parentId
+    )
+    
+    if (!parentItem) {
+      // Parent not found in cache, stop walking
+      break
+    }
+    
+    currentItem = parentItem
+  }
+
+  return false
+}
+
+/**
+ * Gets all cached descendants of a folder (at any depth)
+ */
+function getAllCachedDescendants(
+  folderId: string,
+  queryClient: QueryClient
+): FileItem[] {
+  const allItems = getAllCachedItems(queryClient)
+  
+  return allItems.filter((item) => 
+    isDescendantOf(item, folderId, allItems)
+  )
+}
 
 interface SelectionStore {
   selectedItems: Map<string, FileItem>
+  pendingAutoSelection: Set<string> // Folders waiting for their children to be auto-selected
 
   toggleSelection: (item: FileItem) => void
   toggleFolderSelection: (folder: FileItem, children?: FileItem[]) => void
+  toggleFolderSelectionRecursive: (folder: FileItem, queryClient: QueryClient) => void
+  autoSelectNewlyFetchedChildren: (folderId: string, queryClient: QueryClient) => void
   clearSelection: () => void
 
   isSelected: (itemId: string) => boolean
@@ -15,6 +86,7 @@ interface SelectionStore {
 
 export const useSelectionStore = create<SelectionStore>((set, get) => ({
   selectedItems: new Map<string, FileItem>(),
+  pendingAutoSelection: new Set<string>(),
 
   toggleSelection: (item: FileItem) => {
     set((state) => {
@@ -57,8 +129,76 @@ export const useSelectionStore = create<SelectionStore>((set, get) => ({
     })
   },
 
+  toggleFolderSelectionRecursive: (folder: FileItem, queryClient: QueryClient) => {
+    set((state) => {
+      const newSelectedItems = new Map(state.selectedItems)
+      const newPendingAutoSelection = new Set(state.pendingAutoSelection)
+      const isCurrentlySelected = state.selectedItems.has(folder.resource_id)
+
+      // Get all cached descendants at any depth
+      const allDescendants = getAllCachedDescendants(folder.resource_id, queryClient)
+
+      if (isCurrentlySelected) {
+        // Deselect folder and all cached descendants
+        newSelectedItems.delete(folder.resource_id)
+        allDescendants.forEach((descendant) => {
+          newSelectedItems.delete(descendant.resource_id)
+        })
+        // Remove from pending auto-selection
+        newPendingAutoSelection.delete(folder.resource_id)
+      } else {
+        // Select folder and all cached descendants
+        newSelectedItems.set(folder.resource_id, folder)
+        allDescendants.forEach((descendant) => {
+          newSelectedItems.set(descendant.resource_id, descendant)
+        })
+        
+        // If folder has no cached descendants, mark for auto-selection when fetched
+        if (allDescendants.length === 0) {
+          newPendingAutoSelection.add(folder.resource_id)
+        }
+      }
+
+      return { 
+        selectedItems: newSelectedItems,
+        pendingAutoSelection: newPendingAutoSelection
+      }
+    })
+  },
+
+  autoSelectNewlyFetchedChildren: (folderId: string, queryClient: QueryClient) => {
+    set((state) => {
+      // Only proceed if this folder is pending auto-selection
+      if (!state.pendingAutoSelection.has(folderId)) {
+        return state
+      }
+
+      const newSelectedItems = new Map(state.selectedItems)
+      const newPendingAutoSelection = new Set(state.pendingAutoSelection)
+
+      // Get all newly cached descendants
+      const allDescendants = getAllCachedDescendants(folderId, queryClient)
+      
+      // Select all descendants
+      allDescendants.forEach((descendant) => {
+        newSelectedItems.set(descendant.resource_id, descendant)
+      })
+
+      // Remove from pending since we've processed it
+      newPendingAutoSelection.delete(folderId)
+
+      return {
+        selectedItems: newSelectedItems,
+        pendingAutoSelection: newPendingAutoSelection
+      }
+    })
+  },
+
   clearSelection: () => {
-    set({ selectedItems: new Map<string, FileItem>() })
+    set({ 
+      selectedItems: new Map<string, FileItem>(),
+      pendingAutoSelection: new Set<string>()
+    })
   },
 
   isSelected: (itemId: string) => {

@@ -1,6 +1,7 @@
 "use client"
 
 import { memo, useCallback, useState, useEffect } from "react"
+import { useQueryClient } from "@tanstack/react-query"
 import {
   ChevronRight,
   ChevronDown,
@@ -55,9 +56,11 @@ function FileTreeItemComponent({
   }, [item.resource_id])
 
   const toggleSelection = useSelectionStore((state) => state.toggleSelection)
-  const toggleFolderSelection = useSelectionStore(
-    (state) => state.toggleFolderSelection,
+  const toggleFolderSelectionRecursive = useSelectionStore(
+    (state) => state.toggleFolderSelectionRecursive,
   )
+  
+  const queryClient = useQueryClient()
 
   const {
     isExpanded,
@@ -69,20 +72,17 @@ function FileTreeItemComponent({
   } = useFolderOperations(item)
 
   const handleCheckboxChange = useCallback(() => {
-    if (isFolder && folderData?.files) {
-      const validChildren = folderData.files.filter(
-        (child) => child.parentId === item.resource_id,
-      )
-      toggleFolderSelection(item, validChildren)
+    if (isFolder) {
+      toggleFolderSelectionRecursive(item, queryClient)
     } else {
       toggleSelection(item)
     }
   }, [
     isFolder,
-    folderData?.files,
     item,
-    toggleFolderSelection,
+    toggleFolderSelectionRecursive,
     toggleSelection,
+    queryClient,
   ])
 
   return (

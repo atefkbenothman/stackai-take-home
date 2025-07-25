@@ -12,13 +12,7 @@ function FileTreeFooterComponent() {
   )
   const clearSelection = useSelectionStore((state) => state.clearSelection)
 
-  const {
-    indexFiles,
-    batchDeindexFiles,
-    cancelIndexing,
-    isIndexing,
-    activeIndexing,
-  } = useFileIndexing()
+  const { indexFiles, batchDeindexFiles, isIndexing } = useFileIndexing()
 
   const selectedItems = getMinimalSelectedItems()
 
@@ -92,17 +86,6 @@ function FileTreeFooterComponent() {
       </div>
 
       <div className="ml-auto flex items-center space-x-2">
-        {!!activeIndexing && (
-          <Button
-            onClick={cancelIndexing}
-            variant="outline"
-            size="sm"
-            className="h-6 rounded-xs border-red-300 px-2 text-xs text-red-600 hover:cursor-pointer hover:bg-red-50"
-          >
-            Cancel
-          </Button>
-        )}
-
         {selectedCount > 0 && (
           <>
             <Button
