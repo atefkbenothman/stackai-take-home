@@ -123,7 +123,7 @@ function FileTreeItemComponent({
         </div>
 
         <div className="min-w-0 flex-1 overflow-x-auto">
-          <span className="font-mono text-sm whitespace-nowrap">
+          <span className="font-mono text-xs whitespace-nowrap">
             {item.inode_path.path}
           </span>
         </div>

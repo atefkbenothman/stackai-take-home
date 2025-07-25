@@ -49,7 +49,7 @@ export function StatusBadge({ status, file, onDeindex }: StatusBadgeProps) {
   if (canDeindex) {
     return (
       <span
-        className={`group inline-flex cursor-pointer items-center gap-1 rounded-xs px-2 py-1 text-xs font-medium transition-colors hover:bg-red-100 hover:text-red-800 ${config.className}`}
+        className={`group inline-flex cursor-pointer items-center gap-0.5 rounded-xs px-1.5 py-0.5 text-[10px] font-medium transition-colors hover:bg-red-100 hover:text-red-800 ${config.className}`}
         onClick={(e) => {
           e.stopPropagation()
           onDeindex(file)
@@ -58,13 +58,13 @@ export function StatusBadge({ status, file, onDeindex }: StatusBadgeProps) {
       >
         {Icon && (
           <Icon
-            size={12}
+            size={10}
             className={"iconClassName" in config ? config.iconClassName : ""}
           />
         )}
         {config.text}
         <X
-          size={10}
+          size={8}
           className="opacity-0 transition-opacity group-hover:opacity-100"
         />
       </span>
@@ -73,11 +73,11 @@ export function StatusBadge({ status, file, onDeindex }: StatusBadgeProps) {
 
   return (
     <span
-      className={`inline-flex items-center gap-1 rounded-xs px-2 py-1 text-xs font-medium ${config.className}`}
+      className={`inline-flex items-center gap-0.5 rounded-xs px-1.5 py-0.5 text-[10px] font-medium ${config.className}`}
     >
       {Icon && (
         <Icon
-          size={12}
+          size={10}
           className={"iconClassName" in config ? config.iconClassName : ""}
         />
       )}

@@ -77,6 +77,58 @@ function groupFilesByFolder(files: FileItem[]): Map<string, FileItem[]> {
 }
 
 /**
+ * Update children of an indexed folder with their real backend status
+ * This queries the KB for the folder's contents and updates each child's status
+ */
+async function updateFolderChildrenStatus(
+  knowledgeBaseId: string,
+  folderPath: string,
+  queryClient: QueryClient,
+) {
+  try {
+    // Query the Knowledge Base for this folder's contents (like notebook cell 37)
+    const kbFolderPath = `/${folderPath}`
+    const folderContents = await getKnowledgeBaseStatus(knowledgeBaseId, kbFolderPath)
+    
+    // Update each child file with its real backend status
+    folderContents.data.forEach((child: KBResource) => {
+      const childStatus = mapKBStatusToIndexingStatus(child.status, child.resource_id)
+      
+      // Find the child in our cache by path (since resource IDs might be different)
+      // We need to update the cache for all files that match this path
+      const queryCache = queryClient.getQueryCache()
+      queryCache.getAll().forEach((query: Query) => {
+        if (query.queryKey[0] === "files") {
+          queryClient.setQueryData(
+            query.queryKey,
+            (oldData: FilesResponse | undefined) => {
+              if (!oldData) return oldData
+
+              return {
+                ...oldData,
+                files: oldData.files.map((file: FileItem) =>
+                  file.inode_path.path === child.inode_path.path
+                    ? {
+                        ...file,
+                        indexingStatus: childStatus,
+                        kbResourceId: knowledgeBaseId, // Store the KB UUID for de-indexing
+                        lastIndexedAt: childStatus === "indexed" ? new Date().toISOString() : file.lastIndexedAt,
+                      }
+                    : file,
+                ),
+              }
+            },
+          )
+        }
+      })
+    })
+  } catch (error) {
+    // Silently handle errors - folder children status update is best-effort
+    console.warn(`Failed to update children status for folder ${folderPath}:`, error)
+  }
+}
+
+/**
  * Shared utility to update file indexing status in TanStack Query cache
  * This updates all relevant file caches to maintain consistency
  */
@@ -417,6 +469,15 @@ export function useFileIndexing(): UseFileIndexingReturn {
           undefined,
           activeIndexing.knowledgeBaseId, // Always use the real KB UUID
         )
+
+        // If this is a folder that just became "indexed", update its children with real backend status
+        if (file.inode_type === "directory" && indexingStatus === "indexed") {
+          // Don't await this - let it run in background to avoid blocking other updates
+          updateFolderChildrenStatus(activeIndexing.knowledgeBaseId, file.inode_path.path, queryClient)
+            .catch((error) => {
+              console.warn(`Failed to update children for folder ${file.inode_path.path}:`, error)
+            })
+        }
       }
     })
   }, [kbStatusData, activeIndexing, queryClient])
