@@ -50,6 +50,35 @@ export function getParentFolderPath(filePath: string): string {
   return filePath.substring(0, lastSlashIndex)
 }
 
+/**
+ * Aggregate child file statuses to determine overall folder status
+ */
+export function aggregateFolderStatus(childFiles: any[]): IndexingStatus {
+  const actualFiles = childFiles.filter(
+    (f) =>
+      f.inode_type === "file" &&
+      f.resource_id !== "STACK_VFS_VIRTUAL_DIRECTORY",
+  )
+
+  if (actualFiles.length === 0) {
+    return "indexed"
+  }
+
+  if (actualFiles.every((f) => f.status === "indexed")) {
+    return "indexed"
+  }
+
+  if (actualFiles.some((f) => f.status === "error")) {
+    return "error"
+  }
+
+  if (actualFiles.some((f) => f.status === "indexing")) {
+    return "indexing"
+  }
+
+  return "pending"
+}
+
 export function updateFileIndexingStatus(
   queryClient: QueryClient,
   resourceId: string,

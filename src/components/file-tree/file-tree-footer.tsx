@@ -22,19 +22,50 @@ function FileTreeFooterComponent() {
   } = useFileIndexing()
 
   const selectedItems = getMinimalSelectedItems()
+  
+  // Only files can be de-indexed according to take-home requirements
   const indexedFiles = selectedItems.filter(
-    (item) => item.indexingStatus === "indexed",
+    (item) => item.indexingStatus === "indexed" && item.inode_type === "file",
   )
   const notIndexedFiles = selectedItems.filter(
     (item) => item.indexingStatus !== "indexed",
   )
+  
+  // Check if selection contains any folders for de-indexing validation
+  const hasSelectedFolders = selectedItems.some(item => item.inode_type === "directory")
+  const hasIndexedFolders = selectedItems.some(
+    item => item.inode_type === "directory" && item.indexingStatus === "indexed"
+  )
 
-  const selectionState =
-    indexedFiles.length === selectedItems.length
-      ? "all-indexed"
-      : notIndexedFiles.length === selectedItems.length
-        ? "none-indexed"
-        : "mixed"
+  // Separate logic for indexing (files + folders) vs de-indexing (files only)
+  
+  // For INDEXING: Both files and folders can be indexed
+  const indexableItems = selectedItems // All items can be indexed
+  const indexedItems = indexableItems.filter(item => item.indexingStatus === "indexed")
+  const notIndexedItems = indexableItems.filter(item => item.indexingStatus !== "indexed")
+  
+  // For DE-INDEXING: Only files can be de-indexed (per take-home requirements)
+  const selectedFiles = selectedItems.filter(item => item.inode_type === "file")
+  const indexedSelectedFiles = selectedFiles.filter(item => item.indexingStatus === "indexed")
+  
+  const selectionState = (() => {
+    if (selectedItems.length === 0) {
+      return "none-selected"
+    }
+    
+    // All selected items are indexed - show de-index option (but only if files are present)
+    if (indexedItems.length === selectedItems.length) {
+      return "all-indexed"
+    }
+    
+    // No selected items are indexed - show index option
+    if (notIndexedItems.length === selectedItems.length) {
+      return "none-indexed"
+    }
+    
+    // Mixed indexing states
+    return "mixed"
+  })()
 
   const handleIndexFiles = useCallback(() => {
     const selectedItems = getMinimalSelectedItems()
@@ -44,7 +75,15 @@ function FileTreeFooterComponent() {
 
   const handleDeindexFiles = useCallback(() => {
     const selectedItems = getMinimalSelectedItems()
-    batchDeindexFiles(selectedItems)
+    // Filter to only include files as per take-home requirements
+    const filesToDeindex = selectedItems.filter(item => item.inode_type === "file")
+    
+    if (filesToDeindex.length === 0) {
+      // This shouldn't happen due to UI logic, but adding as safeguard
+      return
+    }
+    
+    batchDeindexFiles(filesToDeindex)
     clearSelection()
   }, [getMinimalSelectedItems, batchDeindexFiles, clearSelection])
 
@@ -81,21 +120,33 @@ function FileTreeFooterComponent() {
               Clear
             </Button>
 
-            {selectionState === "all-indexed" && (
+            {selectionState === "all-indexed" && indexedSelectedFiles.length > 0 && (
               <Button
                 onClick={handleDeindexFiles}
-                disabled={isIndexing || isPolling}
+                disabled={isIndexing}
                 size="sm"
                 className="h-6 rounded-xs bg-red-500 px-2 text-xs text-white hover:cursor-pointer hover:bg-red-600"
+                title={hasIndexedFolders ? "Only files can be de-indexed. Folders will be skipped." : undefined}
               >
-                {isIndexing ? "De-indexing..." : "De-index"}
+                {isIndexing ? "De-indexing..." : `De-index ${indexedSelectedFiles.length} file${indexedSelectedFiles.length !== 1 ? 's' : ''}`}
+              </Button>
+            )}
+
+            {selectionState === "all-indexed" && indexedSelectedFiles.length === 0 && (
+              <Button
+                disabled={true}
+                size="sm"
+                className="h-6 rounded-xs px-2 text-xs disabled:cursor-not-allowed disabled:bg-gray-400"
+                title="Only files can be de-indexed. Folders are already indexed and cannot be de-indexed individually."
+              >
+                All Indexed
               </Button>
             )}
 
             {selectionState === "none-indexed" && (
               <Button
                 onClick={handleIndexFiles}
-                disabled={isIndexing || isPolling}
+                disabled={isIndexing}
                 size="sm"
                 className="h-6 rounded-xs bg-blue-500 px-2 text-xs text-white hover:cursor-pointer hover:bg-blue-600"
               >
@@ -109,6 +160,7 @@ function FileTreeFooterComponent() {
                 disabled={true}
                 size="sm"
                 className="h-6 rounded-xs px-2 text-xs disabled:cursor-not-allowed disabled:bg-gray-400"
+                title="Mixed selection - some items indexed, some not. Clear selection and choose items with same status."
               >
                 Mixed Selection
               </Button>
@@ -116,7 +168,7 @@ function FileTreeFooterComponent() {
           </>
         )}
 
-        {selectedCount === 0 && (
+        {(selectedCount === 0 || selectionState === "none-selected") && (
           <Button
             onClick={handleIndexFiles}
             disabled={true}

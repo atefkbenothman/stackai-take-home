@@ -11,7 +11,6 @@ import {
 import type { FileItem, ActiveIndexing, FilesResponse } from "@/lib/types"
 import { useFileStatus } from "@/hooks/use-file-status"
 
-
 interface UseFileIndexingReturn {
   indexFiles: (selectedItems: FileItem[]) => void
   deindexFile: (file: FileItem) => void
@@ -23,14 +22,19 @@ interface UseFileIndexingReturn {
   activeIndexing: ActiveIndexing | null
 }
 
-async function indexFilesAPI(selectedItems: FileItem[], queryClient: QueryClient) {
+async function indexFilesAPI(
+  selectedItems: FileItem[],
+  queryClient: QueryClient,
+) {
   // Extract connection metadata from existing TanStack Query cache
   const rootData = queryClient.getQueryData<FilesResponse>(["files"])
   const connectionId = rootData?.connection_id
   const orgId = rootData?.org_id
 
   if (!connectionId || !orgId) {
-    throw new Error("Connection metadata not available. Please refresh the page.")
+    throw new Error(
+      "Connection metadata not available. Please refresh the page.",
+    )
   }
 
   // Extract resource IDs
@@ -50,6 +54,10 @@ async function indexFilesAPI(selectedItems: FileItem[], queryClient: QueryClient
 }
 
 async function deindexFileAPI(file: FileItem) {
+  if (file.inode_type !== "file") {
+    throw new Error("Only files can be de-indexed, not folders")
+  }
+
   if (!file.kbResourceId) {
     throw new Error("File is not indexed - missing Knowledge Base ID")
   }
@@ -61,9 +69,12 @@ async function deindexFileAPI(file: FileItem) {
 }
 
 async function batchDeindexFilesAPI(selectedItems: FileItem[]) {
-  // Filter to only indexed files that have KB resource IDs
+  // Filter to only indexed files (not folders) that have KB resource IDs
   const indexedFiles = selectedItems.filter(
-    (item) => item.indexingStatus === "indexed" && item.kbResourceId,
+    (item) =>
+      item.inode_type === "file" &&
+      item.indexingStatus === "indexed" &&
+      item.kbResourceId,
   )
 
   if (indexedFiles.length === 0) {
@@ -100,7 +111,8 @@ export function useFileIndexing(): UseFileIndexingReturn {
 
   // Knowledge Base indexing mutation
   const mutation = useMutation({
-    mutationFn: (selectedItems: FileItem[]) => indexFilesAPI(selectedItems, queryClient),
+    mutationFn: (selectedItems: FileItem[]) =>
+      indexFilesAPI(selectedItems, queryClient),
     onMutate: async (selectedItems: FileItem[]) => {
       if (selectedItems.length === 0) {
         toast.error("No files selected for indexing")
@@ -130,7 +142,6 @@ export function useFileIndexing(): UseFileIndexingReturn {
     },
     onSuccess: (data) => {
       const { knowledgeBaseId, selectedItems } = data
-
 
       // Immediately set files to "indexing" status since KB creation succeeded
       selectedItems.forEach((item) => {
@@ -178,7 +189,7 @@ export function useFileIndexing(): UseFileIndexingReturn {
   useEffect(() => {
     if (allFilesCompleted && activeIndexing) {
       setActiveIndexing(null)
-      
+
       if (allFilesSuccessful) {
         toast.success("Indexing completed!")
       } else {
