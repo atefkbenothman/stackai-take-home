@@ -175,7 +175,7 @@ export function useFileStatus(
             resource_id: folder.resource_id,
             inode_type: "directory",
             inode_path: folder.inode_path,
-            status: aggregatedStatus as any, // Cast to match the expected type
+            status: aggregatedStatus,
           }
 
           allResults.push(folderResource)

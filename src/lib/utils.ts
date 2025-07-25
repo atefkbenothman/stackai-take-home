@@ -1,7 +1,13 @@
 import { clsx, type ClassValue } from "clsx"
 import { twMerge } from "tailwind-merge"
 import type { QueryClient } from "@tanstack/react-query"
-import type { FileItem, FilesResponse, IndexingStatus } from "./types"
+import type {
+  FileItem,
+  FilesResponse,
+  IndexingStatus,
+  KBStatus,
+  KBResource,
+} from "@/lib/types"
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
@@ -53,7 +59,7 @@ export function getParentFolderPath(filePath: string): string {
 /**
  * Aggregate child file statuses to determine overall folder status
  */
-export function aggregateFolderStatus(childFiles: any[]): IndexingStatus {
+export function aggregateFolderStatus(childFiles: KBResource[]): KBStatus {
   const actualFiles = childFiles.filter(
     (f) =>
       f.inode_type === "file" &&

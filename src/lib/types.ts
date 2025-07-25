@@ -1,11 +1,7 @@
 import type { QueryClient } from "@tanstack/react-query"
 
-export type IndexingStatus =
-  | "not-indexed"
-  | "pending"
-  | "indexing"
-  | "indexed"
-  | "error"
+export type KBStatus = "pending" | "indexing" | "indexed" | "error"
+export type IndexingStatus = KBStatus | "not-indexed"
 
 export interface RawFileFromAPI {
   resource_id: string
@@ -84,7 +80,7 @@ export interface KBResource {
   resource_id: string
   inode_type: "file" | "directory"
   inode_path: { path: string }
-  status?: "pending" | "indexing" | "indexed" | "error"
+  status?: KBStatus
   created_at?: string
   updated_at?: string
 }
