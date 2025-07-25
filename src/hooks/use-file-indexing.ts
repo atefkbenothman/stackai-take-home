@@ -1,6 +1,6 @@
 "use client"
 
-import { useMutation, useQueryClient, QueryClient } from "@tanstack/react-query"
+import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { useState, useEffect, useCallback } from "react"
 import { toast } from "sonner"
 import {
@@ -9,7 +9,7 @@ import {
   deleteFromKnowledgeBase,
 } from "@/lib/stack-ai-api"
 import type { FileItem, ActiveIndexing, FilesResponse } from "@/lib/types"
-import { useFileStatus } from "@/hooks/use-file-status"
+import { useFileStatus } from "./use-file-status"
 
 interface UseFileIndexingReturn {
   indexFiles: (selectedItems: FileItem[]) => void
@@ -22,120 +22,77 @@ interface UseFileIndexingReturn {
   activeIndexing: ActiveIndexing | null
 }
 
-async function indexFilesAPI(
-  selectedItems: FileItem[],
-  queryClient: QueryClient,
-) {
-  // Extract connection metadata from existing TanStack Query cache
-  const rootData = queryClient.getQueryData<FilesResponse>(["files"])
-  const connectionId = rootData?.connection_id
-  const orgId = rootData?.org_id
-
-  if (!connectionId || !orgId) {
-    throw new Error(
-      "Connection metadata not available. Please refresh the page.",
-    )
-  }
-
-  // Extract resource IDs
-  const selectedResourceIds = selectedItems.map((item) => item.resource_id)
-
-  // Create KB with files included
-  const newKb = await createKnowledgeBase(
-    connectionId,
-    selectedResourceIds,
-    `File Picker KB - ${new Date().toISOString()}`,
-    "Knowledge Base created via file picker",
-  )
-
-  await triggerKnowledgeBaseSync(newKb.knowledge_base_id)
-
-  return { knowledgeBaseId: newKb.knowledge_base_id, selectedItems }
-}
-
-async function deindexFileAPI(file: FileItem) {
-  if (file.inode_type !== "file") {
-    throw new Error("Only files can be de-indexed, not folders")
-  }
-
-  if (!file.kbResourceId) {
-    throw new Error("File is not indexed - missing Knowledge Base ID")
-  }
-
-  // Use the resource path for deletion as per the Jupyter notebook
-  await deleteFromKnowledgeBase(file.kbResourceId, file.inode_path.path)
-
-  return { file }
-}
-
-async function batchDeindexFilesAPI(selectedItems: FileItem[]) {
-  // Filter to only indexed files (not folders) that have KB resource IDs
-  const indexedFiles = selectedItems.filter(
-    (item) =>
-      item.inode_type === "file" &&
-      item.indexingStatus === "indexed" &&
-      item.kbResourceId,
-  )
-
-  if (indexedFiles.length === 0) {
-    throw new Error("No indexed files found in selection")
-  }
-
-  // De-index each file from its respective Knowledge Base
-  const results = await Promise.allSettled(
-    indexedFiles.map(async (file) => {
-      await deleteFromKnowledgeBase(file.kbResourceId!, file.inode_path.path)
-      return file
-    }),
-  )
-
-  // Check for failures
-  const failures = results.filter((result) => result.status === "rejected")
-  if (failures.length > 0) {
-    const firstError = (failures[0] as PromiseRejectedResult).reason
-    throw new Error(`Failed to de-index some files: ${firstError.message}`)
-  }
-
-  return { selectedItems: indexedFiles }
-}
-
 export function useFileIndexing(): UseFileIndexingReturn {
   const queryClient = useQueryClient()
   const [activeIndexing, setActiveIndexing] = useState<ActiveIndexing | null>(
     null,
   )
 
-  // Use the file status hook for status monitoring
-  const { isPolling, updateFileStatus, allFilesCompleted, allFilesSuccessful } =
+  const { isPolling, allFilesCompleted, allFilesSuccessful } =
     useFileStatus(activeIndexing)
 
-  // Knowledge Base indexing mutation
-  const mutation = useMutation({
-    mutationFn: (selectedItems: FileItem[]) =>
-      indexFilesAPI(selectedItems, queryClient),
+  // Update files in cache
+  const updateFilesInCache = useCallback(
+    (files: FileItem[], updateFn: (file: FileItem) => Partial<FileItem>) => {
+      files.forEach((file) => {
+        const targetQuery = file.parentId ? ["files", file.parentId] : ["files"]
+        queryClient.setQueryData(
+          targetQuery,
+          (oldData: FilesResponse | undefined) => {
+            if (!oldData) return oldData
+            return {
+              ...oldData,
+              files: oldData.files.map((f) =>
+                f.resource_id === file.resource_id
+                  ? { ...f, ...updateFn(file) }
+                  : f,
+              ),
+            }
+          },
+        )
+      })
+    },
+    [queryClient],
+  )
+
+  // Index files mutation
+  const indexMutation = useMutation({
+    mutationFn: async (selectedItems: FileItem[]) => {
+      // Extract connection info from cache
+      const rootData = queryClient.getQueryData<FilesResponse>(["files"])
+      if (!rootData?.connection_id || !rootData?.org_id) {
+        throw new Error(
+          "Connection metadata not available. Please refresh the page.",
+        )
+      }
+
+      // Create KB
+      const newKb = await createKnowledgeBase(
+        rootData.connection_id,
+        selectedItems.map((item) => item.resource_id),
+        `File Picker KB - ${new Date().toISOString()}`,
+        "Knowledge Base created via file picker",
+      )
+
+      // Start sync
+      await triggerKnowledgeBaseSync(newKb.knowledge_base_id)
+
+      return { knowledgeBaseId: newKb.knowledge_base_id, selectedItems }
+    },
     onMutate: async (selectedItems: FileItem[]) => {
       if (selectedItems.length === 0) {
         toast.error("No files selected for indexing")
         throw new Error("No files selected")
       }
-
-      // Prevent multiple simultaneous indexing operations
       if (activeIndexing) {
         toast.error("Another indexing operation is already in progress")
         throw new Error("Indexing already in progress")
       }
 
-      // Optimistically update all selected files to "pending" status
-      selectedItems.forEach((item) => {
-        updateFileStatus(
-          queryClient,
-          item.resource_id,
-          "pending",
-          undefined,
-          undefined,
-          item,
-        )
-      })
+      // Set all files to pending
+      updateFilesInCache(selectedItems, () => ({
+        indexingStatus: "pending" as const,
+      }))
 
       toast.info("Indexing files...")
       return { selectedItems }
@@ -143,19 +100,13 @@ export function useFileIndexing(): UseFileIndexingReturn {
     onSuccess: (data) => {
       const { knowledgeBaseId, selectedItems } = data
 
-      // Immediately set files to "indexing" status since KB creation succeeded
-      selectedItems.forEach((item) => {
-        updateFileStatus(
-          queryClient,
-          item.resource_id,
-          "indexing",
-          undefined,
-          knowledgeBaseId,
-          item,
-        )
-      })
+      // Update files to indexing status
+      updateFilesInCache(selectedItems, () => ({
+        indexingStatus: "indexing" as const,
+        kbResourceId: knowledgeBaseId,
+      }))
 
-      // Start status polling
+      // Start polling
       setActiveIndexing({
         knowledgeBaseId,
         selectedFiles: selectedItems,
@@ -167,103 +118,96 @@ export function useFileIndexing(): UseFileIndexingReturn {
       )
     },
     onError: (error, selectedItems) => {
-      // Rollback optimistic updates - set files back to "error"
-      selectedItems.forEach((item) => {
-        updateFileStatus(
-          queryClient,
-          item.resource_id,
-          "error",
-          error instanceof Error ? error.message : "Unknown error",
-          undefined,
-          item,
-        )
-      })
+      const errorMessage =
+        error instanceof Error ? error.message : "Unknown error"
 
-      toast.error(
-        `Failed to index files: ${error instanceof Error ? error.message : "Unknown error"}`,
-      )
+      // Set files to error status
+      updateFilesInCache(selectedItems, () => ({
+        indexingStatus: "error" as const,
+        indexingError: errorMessage,
+      }))
+
+      toast.error(`Failed to index files: ${errorMessage}`)
     },
   })
 
-  // Stop polling when all files are completed and show appropriate toast
-  useEffect(() => {
-    if (allFilesCompleted && activeIndexing) {
-      setActiveIndexing(null)
-
-      if (allFilesSuccessful) {
-        toast.success("Indexing completed!")
-      } else {
-        toast.error("Some files failed to index")
-      }
-    }
-  }, [allFilesCompleted, allFilesSuccessful, activeIndexing])
-
-  useEffect(() => {
-    if (!activeIndexing) return
-
-    const timeoutMs = 5 * 60 * 1000 // 5 minutes
-    const elapsed = Date.now() - activeIndexing.startTime
-
-    if (elapsed >= timeoutMs) {
-      setActiveIndexing(null)
-      toast.error(
-        "Indexing timed out after 5 minutes. Please check status manually.",
-      )
-      return
-    }
-
-    const remainingTime = timeoutMs - elapsed
-    const timeoutId = setTimeout(() => {
-      setActiveIndexing(null)
-      toast.error(
-        "Indexing timed out after 5 minutes. Please check status manually.",
-      )
-    }, remainingTime)
-
-    return () => clearTimeout(timeoutId)
-  }, [activeIndexing])
-
-  // De-indexing mutation for individual files
+  // Deindex single file
   const deindexMutation = useMutation({
-    mutationFn: deindexFileAPI,
+    mutationFn: async (file: FileItem) => {
+      if (file.inode_type !== "file") {
+        throw new Error("Only files can be de-indexed, not folders")
+      }
+      if (!file.kbResourceId) {
+        throw new Error("File is not indexed - missing Knowledge Base ID")
+      }
+
+      await deleteFromKnowledgeBase(file.kbResourceId, file.inode_path.path)
+      return { file }
+    },
     onMutate: async (file: FileItem) => {
-      // Optimistically update file to "not-indexed" status
-      updateFileStatus(
-        queryClient,
-        file.resource_id,
-        "not-indexed",
-        undefined,
-        undefined,
-        file,
-      )
+      // Optimistic update
+      updateFilesInCache([file], () => ({
+        indexingStatus: "not-indexed" as const,
+        kbResourceId: undefined,
+      }))
 
       toast.info(`Removing "${file.inode_path.path}" from knowledge base...`)
       return { file }
     },
-    onSuccess: (data) => {
-      const { file } = data
+    onSuccess: ({ file }) => {
       toast.success(`Removed "${file.inode_path.path}" from knowledge base`)
     },
     onError: (error, file) => {
-      // Rollback optimistic update - restore the indexed status
-      updateFileStatus(
-        queryClient,
-        file.resource_id,
-        "indexed",
-        undefined,
-        file.kbResourceId,
-        file,
-      )
+      const errorMessage =
+        error instanceof Error ? error.message : "Unknown error"
+
+      // Rollback
+      updateFilesInCache([file], (f) => ({
+        indexingStatus: "indexed" as const,
+        kbResourceId: f.kbResourceId,
+      }))
 
       toast.error(
-        `Failed to remove "${file.inode_path.path}" from knowledge base: ${error instanceof Error ? error.message : "Unknown error"}`,
+        `Failed to remove "${file.inode_path.path}" from knowledge base: ${errorMessage}`,
       )
     },
   })
 
-  // Batch de-indexing mutation for multiple files
+  // Batch deindex files
   const batchDeindexMutation = useMutation({
-    mutationFn: batchDeindexFilesAPI,
+    mutationFn: async (selectedItems: FileItem[]) => {
+      // Filter to only indexed files that have KB resource IDs
+      const indexedFiles = selectedItems.filter(
+        (item) =>
+          item.inode_type === "file" &&
+          item.indexingStatus === "indexed" &&
+          item.kbResourceId,
+      )
+
+      if (indexedFiles.length === 0) {
+        throw new Error("No indexed files found in selection")
+      }
+
+      // De-index each file from its respective Knowledge Base
+      const results = await Promise.allSettled(
+        indexedFiles.map(async (file) => {
+          await deleteFromKnowledgeBase(
+            file.kbResourceId!,
+            file.inode_path.path,
+          )
+          return file
+        }),
+      )
+
+      // Check for failures
+      const failures = results.filter((result) => result.status === "rejected")
+      if (failures.length > 0) {
+        const firstError = (failures[0] as PromiseRejectedResult).reason
+        throw new Error(`Failed to de-index some files: ${firstError.message}`)
+      }
+
+      return { selectedItems: indexedFiles }
+    },
     onMutate: async (selectedItems: FileItem[]) => {
       const indexedFiles = selectedItems.filter(
         (item) => item.indexingStatus === "indexed" && item.kbResourceId,
@@ -274,87 +218,105 @@ export function useFileIndexing(): UseFileIndexingReturn {
         throw new Error("No indexed files to de-index")
       }
 
-      // Optimistically update all indexed files to "not-indexed" status
-      indexedFiles.forEach((item) => {
-        updateFileStatus(
-          queryClient,
-          item.resource_id,
-          "not-indexed",
-          undefined,
-          undefined,
-          item,
-        )
-      })
+      // Optimistic update
+      updateFilesInCache(indexedFiles, () => ({
+        indexingStatus: "not-indexed" as const,
+        kbResourceId: undefined,
+      }))
 
       toast.info(
         `Removing ${indexedFiles.length} file${indexedFiles.length !== 1 ? "s" : ""} from knowledge base...`,
       )
       return { indexedFiles }
     },
-    onSuccess: (data) => {
-      const { selectedItems } = data
+    onSuccess: ({ selectedItems }) => {
       toast.success(
         `Removed ${selectedItems.length} file${selectedItems.length !== 1 ? "s" : ""} from knowledge base`,
       )
     },
     onError: (error, _, context) => {
-      // Rollback optimistic updates - restore indexed status for all files
+      const errorMessage =
+        error instanceof Error ? error.message : "Unknown error"
+
+      // Rollback optimistic updates
       if (context?.indexedFiles) {
-        context.indexedFiles.forEach((item: FileItem) => {
-          updateFileStatus(
-            queryClient,
-            item.resource_id,
-            "indexed",
-            undefined,
-            item.kbResourceId,
-            item,
-          )
-        })
+        updateFilesInCache(context.indexedFiles, (file) => ({
+          indexingStatus: "indexed" as const,
+          kbResourceId: file.kbResourceId,
+        }))
       }
 
-      toast.error(
-        `Failed to remove files from knowledge base: ${error instanceof Error ? error.message : "Unknown error"}`,
-      )
+      toast.error(`Failed to remove files from knowledge base: ${errorMessage}`)
     },
   })
 
-  const isIndexing =
-    mutation.isPending ||
-    deindexMutation.isPending ||
-    batchDeindexMutation.isPending
-  const isActive = isIndexing || isPolling
+  // Handle completion
+  useEffect(() => {
+    if (allFilesCompleted && activeIndexing) {
+      setActiveIndexing(null)
+      if (allFilesSuccessful) {
+        toast.success("Indexing completed!")
+      } else {
+        toast.error("Some files failed to index")
+      }
+    }
+  }, [allFilesCompleted, allFilesSuccessful, activeIndexing])
 
-  // Cancel function to stop monitoring and reset state
+  // Handle timeout
+  useEffect(() => {
+    if (!activeIndexing) return
+
+    const timeoutMs = 5 * 60 * 1000
+    const elapsed = Date.now() - activeIndexing.startTime
+
+    if (elapsed >= timeoutMs) {
+      setActiveIndexing(null)
+      toast.error(
+        "Indexing timed out after 5 minutes. Please check status manually.",
+      )
+      return
+    }
+
+    const timeoutId = setTimeout(() => {
+      setActiveIndexing(null)
+      toast.error(
+        "Indexing timed out after 5 minutes. Please check status manually.",
+      )
+    }, timeoutMs - elapsed)
+
+    return () => clearTimeout(timeoutId)
+  }, [activeIndexing])
+
   const cancelIndexing = useCallback(() => {
     if (activeIndexing) {
-      // Rollback optimistic updates - reset files to previous states
-      activeIndexing.selectedFiles.forEach((file) => {
-        updateFileStatus(
-          queryClient,
-          file.resource_id,
-          "not-indexed",
-          undefined,
-          undefined,
-          file,
-        )
-      })
+      // Reset files to not-indexed
+      updateFilesInCache(activeIndexing.selectedFiles, () => ({
+        indexingStatus: "not-indexed" as const,
+        kbResourceId: undefined,
+      }))
 
       setActiveIndexing(null)
-
       toast.info(
         "Stopped monitoring indexing. Operations may continue in background.",
       )
     }
-  }, [activeIndexing, queryClient, updateFileStatus])
+  }, [activeIndexing, updateFilesInCache])
 
   return {
-    indexFiles: mutation.mutate,
+    indexFiles: indexMutation.mutate,
     deindexFile: deindexMutation.mutate,
     batchDeindexFiles: batchDeindexMutation.mutate,
     cancelIndexing,
-    isIndexing,
+    isIndexing:
+      indexMutation.isPending ||
+      deindexMutation.isPending ||
+      batchDeindexMutation.isPending,
     isPolling,
-    isActive,
+    isActive:
+      indexMutation.isPending ||
+      deindexMutation.isPending ||
+      batchDeindexMutation.isPending ||
+      isPolling,
     activeIndexing,
   }
 }

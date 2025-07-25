@@ -10,47 +10,126 @@ import type {
   FilesResponse,
   FileItem,
 } from "@/lib/types"
-import {
-  mapKBStatusToIndexingStatus,
-  updateFileIndexingStatus,
-  getParentFolderPath,
-  aggregateFolderStatus,
-} from "@/lib/utils"
 
 export function useFileStatus(
   activeIndexing: ActiveIndexing | null,
 ): UseFileStatusReturn {
   const queryClient = useQueryClient()
 
-  // Status polling query - queries parent folders and filters for selected files
+  const mapKBStatus = (status?: string): "indexed" | "error" | "indexing" => {
+    return status === "indexed"
+      ? "indexed"
+      : status === "error"
+        ? "error"
+        : "indexing"
+  }
+
+  const createExistingFilesMap = (files: FileItem[]): Map<string, FileItem> => {
+    return new Map(files.map((f) => [f.resource_id, f]))
+  }
+
+  // Process KB resource into FileItem (update existing or create new)
+  const processKBResource = (
+    kbResource: KBResource,
+    existingFiles: Map<string, FileItem>,
+    folder: FileItem,
+    knowledgeBaseId: string,
+  ): FileItem => {
+    const existing = existingFiles.get(kbResource.resource_id)
+
+    if (existing) {
+      // Update existing file with new status
+      return {
+        ...existing,
+        indexingStatus: mapKBStatus(kbResource.status),
+        kbResourceId: knowledgeBaseId,
+        lastIndexedAt: kbResource.created_at,
+      }
+    }
+
+    // Create new file item
+    return {
+      resource_id: kbResource.resource_id,
+      inode_type: kbResource.inode_type as "file" | "directory",
+      inode_path: kbResource.inode_path,
+      created_at: kbResource.created_at || "",
+      modified_at: kbResource.updated_at || "",
+      parentId: folder.resource_id,
+      indexingStatus: mapKBStatus(kbResource.status),
+      kbResourceId: knowledgeBaseId,
+      lastIndexedAt: kbResource.created_at,
+    }
+  }
+
+  // Update folder cache with children
+  const updateFolderCache = (
+    folder: FileItem,
+    folderContents: KBResource[],
+    knowledgeBaseId: string,
+  ) => {
+    queryClient.setQueryData(
+      ["files", folder.resource_id],
+      (oldData: FilesResponse | undefined) => {
+        if (!oldData) return oldData
+
+        const existingFiles = createExistingFilesMap(oldData.files)
+
+        // Process KB resources into updated file items
+        const updatedFiles = folderContents
+          .filter((r) => r.resource_id !== "STACK_VFS_VIRTUAL_DIRECTORY")
+          .map((kbResource) =>
+            processKBResource(
+              kbResource,
+              existingFiles,
+              folder,
+              knowledgeBaseId,
+            ),
+          )
+
+        // Merge with existing files (keep non-updated files, add/update others)
+        const updatedIds = new Set(updatedFiles.map((item) => item.resource_id))
+        const preservedFiles = oldData.files.filter(
+          (file) => !updatedIds.has(file.resource_id),
+        )
+
+        return {
+          ...oldData,
+          files: [...preservedFiles, ...updatedFiles],
+        }
+      },
+    )
+  }
+
+  // Poll KB status for selected files
   const { data: kbStatusData, isLoading: isPollingQuery } = useQuery({
     queryKey: ["kb-status", activeIndexing?.knowledgeBaseId],
     queryFn: async () => {
-      if (!activeIndexing?.knowledgeBaseId) return null
+      if (!activeIndexing) return null
 
-      // Handle both individual files and folders differently
+      const { knowledgeBaseId, selectedFiles } = activeIndexing
       const allResults: KBResource[] = []
 
-      // Separate selected items into files and folders
-      const selectedFiles = activeIndexing.selectedFiles.filter(
+      // STEP 1: Handle individual files - query their parent folders
+      const individualFiles = selectedFiles.filter(
         (f) => f.inode_type === "file",
       )
-      const selectedFolders = activeIndexing.selectedFiles.filter(
-        (f) => f.inode_type === "directory",
-      )
-
-      // For individual files: query their parent folders
-      if (selectedFiles.length > 0) {
+      if (individualFiles.length > 0) {
+        // Get unique parent folders to avoid duplicate API calls
         const parentFolders = new Set<string>()
-        selectedFiles.forEach((file) => {
-          const parentPath = getParentFolderPath(file.inode_path.path)
+        individualFiles.forEach((file) => {
+          const parentPath =
+            file.inode_path.path.substring(
+              0,
+              file.inode_path.path.lastIndexOf("/"),
+            ) || "/"
           parentFolders.add(parentPath)
         })
 
+        // Query each parent folder
         for (const folderPath of parentFolders) {
           try {
             const folderStatus = await getKnowledgeBaseStatus(
-              activeIndexing.knowledgeBaseId,
+              knowledgeBaseId,
               folderPath,
             )
             allResults.push(...folderStatus.data)
@@ -63,139 +142,52 @@ export function useFileStatus(
         }
       }
 
-      // For selected folders: query their contents to get child file statuses
+      // STEP 2: Handle selected folders - query their contents and create synthetic status
+      const selectedFolders = selectedFiles.filter(
+        (f) => f.inode_type === "directory",
+      )
       for (const folder of selectedFolders) {
         try {
           const folderContents = await getKnowledgeBaseStatus(
-            activeIndexing.knowledgeBaseId,
-            folder.inode_path.path, // Query the folder itself
+            knowledgeBaseId,
+            folder.inode_path.path,
           )
 
-          // Update TanStack Query cache with child files and their statuses
-          queryClient.setQueryData(
-            ["files", folder.resource_id], // Folder's file query cache
-            (oldData: FilesResponse | undefined) => {
-              // Create a map of existing files for easy lookup
-              const existingFilesMap = new Map<string, FileItem>()
-              if (oldData?.files) {
-                oldData.files.forEach((file) => {
-                  existingFilesMap.set(file.resource_id, file)
-                })
-              }
+          // Update file tree cache for this folder
+          updateFolderCache(folder, folderContents.data, knowledgeBaseId)
 
-              // Process KB resources and merge with existing data
-              const updatedItems = folderContents.data
-                .filter(
-                  (kbResource) =>
-                    kbResource.resource_id !== "STACK_VFS_VIRTUAL_DIRECTORY",
-                ) // Skip virtual directories
-                .map((kbResource) => {
-                  // Generate unique ID for potential duplicates
-                  const uniqueId =
-                    kbResource.resource_id === "STACK_VFS_VIRTUAL_DIRECTORY"
-                      ? `${kbResource.resource_id}-${kbResource.inode_path.path.replace(/\//g, "-")}`
-                      : kbResource.resource_id
-
-                  // Check if file already exists in cache
-                  const existingFile = existingFilesMap.get(uniqueId)
-
-                  if (existingFile) {
-                    // Merge indexing status with existing file data to preserve original metadata
-                    return {
-                      ...existingFile, // Preserve all original data including modified_at, created_at, dataloader_metadata
-                      // Only update indexing-related fields
-                      indexingStatus: kbResource.status
-                        ? mapKBStatusToIndexingStatus(
-                            kbResource.status,
-                            kbResource.resource_id,
-                          )
-                        : existingFile.indexingStatus,
-                      kbResourceId: kbResource.status
-                        ? activeIndexing.knowledgeBaseId
-                        : existingFile.kbResourceId,
-                      lastIndexedAt: kbResource.status
-                        ? kbResource.created_at
-                        : existingFile.lastIndexedAt,
-                    }
-                  } else {
-                    // Create new FileItem object for files not in cache (shouldn't happen often)
-                    const baseItem: FileItem = {
-                      resource_id: uniqueId,
-                      inode_type: kbResource.inode_type as "file" | "directory",
-                      inode_path: kbResource.inode_path,
-                      created_at: kbResource.created_at || "",
-                      modified_at: kbResource.updated_at || "",
-                      parentId: folder.resource_id,
-                      // Optional fields with defaults
-                      dataloader_metadata: undefined,
-                      indexingStatus: kbResource.status
-                        ? mapKBStatusToIndexingStatus(
-                            kbResource.status,
-                            kbResource.resource_id,
-                          )
-                        : undefined,
-                      kbResourceId: kbResource.status
-                        ? activeIndexing.knowledgeBaseId
-                        : undefined,
-                      indexingError: undefined,
-                      lastIndexedAt: kbResource.status
-                        ? kbResource.created_at
-                        : undefined,
-                    }
-
-                    return baseItem
-                  }
-                })
-
-              // Get IDs of items we're updating
-              const updatedIds = new Set(
-                updatedItems.map((item) => item.resource_id),
-              )
-
-              // Preserve existing items that aren't being updated, merge with updated items
-              const preservedItems = (oldData?.files || []).filter(
-                (existingItem) => !updatedIds.has(existingItem.resource_id),
-              )
-
-              const allItems = [...preservedItems, ...updatedItems]
-
-              return {
-                files: allItems,
-                connection_id: oldData?.connection_id || "",
-                org_id: oldData?.org_id || "",
-              }
-            },
+          // Aggregate folder status: if any file has error -> error, if all indexed -> indexed, else -> indexing
+          const files = folderContents.data.filter(
+            (f) => f.inode_type === "file",
           )
+          const folderStatus =
+            files.length === 0
+              ? "indexed"
+              : files.some((f) => f.status === "error")
+                ? "error"
+                : files.every((f) => f.status === "indexed")
+                  ? "indexed"
+                  : "indexing"
 
-          // Aggregate child file statuses into folder status
-          const aggregatedStatus = aggregateFolderStatus(folderContents.data)
-
-          // Create a synthetic KB resource for the folder with aggregated status
-          const folderResource: KBResource = {
+          allResults.push({
             resource_id: folder.resource_id,
             inode_type: "directory",
             inode_path: folder.inode_path,
-            status: aggregatedStatus,
-          }
-
-          allResults.push(folderResource)
+            status: folderStatus,
+          })
         } catch (error) {
           console.warn(
-            `Failed to get contents for folder ${folder.inode_path.path}:`,
+            `Failed to get folder contents for ${folder.inode_path.path}:`,
             error,
           )
         }
       }
 
-      // Filter results to only include files we actually selected
-      const selectedPaths = new Set(
-        activeIndexing.selectedFiles.map((f) => f.inode_path.path),
-      )
-      const filteredResults = allResults.filter((kbResource) =>
-        selectedPaths.has(kbResource.inode_path.path),
-      )
-
-      return { data: filteredResults }
+      // STEP 3: Filter to only the files we actually selected
+      const selectedPaths = new Set(selectedFiles.map((f) => f.inode_path.path))
+      return {
+        data: allResults.filter((r) => selectedPaths.has(r.inode_path.path)),
+      }
     },
     enabled: !!activeIndexing,
     refetchInterval: 3000,
@@ -203,151 +195,92 @@ export function useFileStatus(
     retry: 2,
   })
 
-  const statusMap = useMemo(() => {
-    if (!activeIndexing || !kbStatusData?.data)
-      return new Map<string, KBResource>()
-
-    const map = new Map<string, KBResource>()
-    kbStatusData.data.forEach((kbResource: KBResource) => {
-      map.set(kbResource.resource_id, kbResource)
-    })
-
-    return map
-  }, [activeIndexing, kbStatusData])
-
-  const statusValues = useMemo(() => {
-    return Array.from(statusMap.values())
-  }, [statusMap])
-
-  // Update file status in cache when polling data changes
+  // Update individual file status in cache
   useEffect(() => {
     if (!activeIndexing || !kbStatusData?.data) return
 
-    // Update cache for each selected file based on KB status
     activeIndexing.selectedFiles.forEach((file) => {
-      // First try exact resource ID match (works for files)
-      let kbResource = statusMap.get(file.resource_id)
-
-      // If no exact match and it's a directory, try path-based matching
-      // This is needed because Stack AI changes directory IDs to STACK_VFS_VIRTUAL_DIRECTORY
-      if (!kbResource && file.inode_type === "directory") {
-        const pathMatches = statusValues.filter(
-          (r) => r.inode_path.path === file.inode_path.path,
-        )
-        if (pathMatches.length > 0) {
-          kbResource = pathMatches[0]
-        }
-      }
+      // Find status by path (handles resource ID changes)
+      const kbResource = kbStatusData.data.find(
+        (r) => r.inode_path.path === file.inode_path.path,
+      )
 
       if (kbResource) {
-        const indexingStatus = mapKBStatusToIndexingStatus(
-          kbResource.status,
-          kbResource.resource_id,
-        )
+        const status = mapKBStatus(kbResource.status)
 
-        // Store the actual Knowledge Base UUID for de-indexing operations
-        updateFileIndexingStatus(
-          queryClient,
-          file.resource_id,
-          indexingStatus,
-          undefined,
-          activeIndexing.knowledgeBaseId,
-          file,
+        // Update the file in cache
+        const targetQuery = file.parentId ? ["files", file.parentId] : ["files"]
+        queryClient.setQueryData(
+          targetQuery,
+          (oldData: FilesResponse | undefined) => {
+            if (!oldData) return oldData
+            return {
+              ...oldData,
+              files: oldData.files.map((f) =>
+                f.resource_id === file.resource_id
+                  ? {
+                      ...f,
+                      indexingStatus: status,
+                      kbResourceId: activeIndexing.knowledgeBaseId,
+                      lastIndexedAt: new Date().toISOString(),
+                    }
+                  : f,
+              ),
+            }
+          },
         )
       }
     })
-  }, [statusMap, statusValues, activeIndexing, queryClient, kbStatusData])
+  }, [activeIndexing, kbStatusData, queryClient])
 
-  // Check if all files have reached a final state (indexed or error)
-  const allFilesCompleted = useMemo(() => {
-    if (!activeIndexing || statusMap.size === 0) return false
+  // Check if all files completed
+  const { allFilesCompleted, allFilesSuccessful } = useMemo(() => {
+    if (!activeIndexing || !kbStatusData?.data) {
+      return { allFilesCompleted: false, allFilesSuccessful: false }
+    }
 
-    const completed = activeIndexing.selectedFiles.every((file) => {
-      // First try exact resource ID match (works for files)
-      let kbResource = statusMap.get(file.resource_id)
+    let completed = true
+    let successful = true
 
-      // If no exact match and it's a directory, try path-based matching
-      if (!kbResource && file.inode_type === "directory") {
-        kbResource = statusValues.find(
-          (kb: KBResource) => kb.inode_path.path === file.inode_path.path,
-        )
-      }
-
-      // If still no match, try path-based matching for files too (resource IDs might differ)
-      if (!kbResource) {
-        kbResource = statusValues.find(
-          (kb: KBResource) => kb.inode_path.path === file.inode_path.path,
-        )
-      }
+    for (const file of activeIndexing.selectedFiles) {
+      const kbResource = kbStatusData.data.find(
+        (r) => r.inode_path.path === file.inode_path.path,
+      )
 
       if (!kbResource) {
-        return false
+        completed = false
+        successful = false
+        break
       }
 
-      // For virtual directories, undefined status means indexed
+      // Virtual directories are always considered completed/successful
       if (
         file.inode_type === "directory" &&
         kbResource.resource_id === "STACK_VFS_VIRTUAL_DIRECTORY"
       ) {
-        return true // Virtual directories are considered completed when they appear
+        continue
       }
 
-      // For regular files, check explicit status
       const isCompleted =
         kbResource.status === "indexed" || kbResource.status === "error"
+      const isSuccessful = kbResource.status === "indexed"
 
-      return isCompleted
-    })
-
-    return completed
-  }, [activeIndexing, statusMap, statusValues])
-
-  // Check if all files are successfully indexed (only "indexed" status, not "error")
-  const allFilesSuccessful = useMemo(() => {
-    if (!activeIndexing || statusMap.size === 0) return false
-
-    const successful = activeIndexing.selectedFiles.every((file) => {
-      // First try exact resource ID match (works for files)
-      let kbResource = statusMap.get(file.resource_id)
-
-      // If no exact match and it's a directory, try path-based matching
-      if (!kbResource && file.inode_type === "directory") {
-        kbResource = statusValues.find(
-          (kb: KBResource) => kb.inode_path.path === file.inode_path.path,
-        )
+      if (!isCompleted) {
+        completed = false
+        successful = false
+        break
       }
-
-      // If still no match, try path-based matching for files too (resource IDs might differ)
-      if (!kbResource) {
-        kbResource = statusValues.find(
-          (kb: KBResource) => kb.inode_path.path === file.inode_path.path,
-        )
+      if (!isSuccessful) {
+        successful = false
       }
+    }
 
-      if (!kbResource) {
-        return false
-      }
-
-      // For virtual directories, undefined status means successfully indexed
-      if (
-        file.inode_type === "directory" &&
-        kbResource.resource_id === "STACK_VFS_VIRTUAL_DIRECTORY"
-      ) {
-        return true // Virtual directories are considered successful when they appear
-      }
-
-      // For regular files, only "indexed" status is successful (not "error")
-      return kbResource.status === "indexed"
-    })
-
-    return successful
-  }, [activeIndexing, statusMap, statusValues])
-
-  const isPolling = isPollingQuery && !!activeIndexing
+    return { allFilesCompleted: completed, allFilesSuccessful: successful }
+  }, [activeIndexing, kbStatusData])
 
   return {
-    isPolling,
-    updateFileStatus: updateFileIndexingStatus,
+    isPolling: isPollingQuery && !!activeIndexing,
+    updateFileStatus: () => {},
     allFilesCompleted,
     allFilesSuccessful,
   }

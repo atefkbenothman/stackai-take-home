@@ -75,10 +75,7 @@ function FileTreeFooterComponent() {
       (item) => item.inode_type === "file",
     )
 
-    if (filesToDeindex.length === 0) {
-      // This shouldn't happen due to UI logic, but adding as safeguard
-      return
-    }
+    if (filesToDeindex.length === 0) return
 
     batchDeindexFiles(filesToDeindex)
     clearSelection()
