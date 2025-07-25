@@ -44,7 +44,7 @@ export function getAllCachedItems(queryClient: QueryClient): FileItem[] {
 export function isDescendantOf(
   childItem: FileItem,
   ancestorId: string,
-  allItems: FileItem[]
+  allItems: FileItem[],
 ): boolean {
   let currentItem = childItem
   const visited = new Set<string>()
@@ -57,7 +57,7 @@ export function isDescendantOf(
     }
 
     const parentItem = allItems.find(
-      (item) => item.resource_id === currentItem.parentId
+      (item) => item.resource_id === currentItem.parentId,
     )
 
     if (!parentItem) {
@@ -75,8 +75,79 @@ export function isDescendantOf(
  */
 export function getAllCachedDescendants(
   folderId: string,
-  queryClient: QueryClient
+  queryClient: QueryClient,
 ): FileItem[] {
   const allItems = getAllCachedItems(queryClient)
   return allItems.filter((item) => isDescendantOf(item, folderId, allItems))
+}
+
+/**
+ * Gets all direct children of a folder from cache
+ */
+export function getDirectChildren(
+  folderId: string,
+  queryClient: QueryClient,
+): FileItem[] {
+  const data = queryClient.getQueryData<FilesResponse>(["files", folderId])
+  return data?.files || []
+}
+
+/**
+ * Checks if a folder has any indexed children (direct children only)
+ */
+export function folderHasIndexedChildren(
+  folderId: string,
+  queryClient: QueryClient,
+): boolean {
+  const children = getDirectChildren(folderId, queryClient)
+  return children.some(
+    (child) =>
+      child.indexingStatus === "indexed" ||
+      child.indexingStatus === "indexing" ||
+      child.indexingStatus === "pending",
+  )
+}
+
+/**
+ * Updates a folder's indexing status in cache
+ */
+export function updateFolderStatus(
+  folderId: string,
+  status: "indexed" | "not-indexed" | "indexing" | "pending",
+  queryClient: QueryClient,
+  kbResourceId?: string,
+): void {
+  // Find which query contains this folder
+  const allItems = getAllCachedItems(queryClient)
+  const folder = allItems.find((item) => item.resource_id === folderId)
+
+  if (!folder) return
+
+  const targetQuery = folder.parentId ? ["files", folder.parentId] : ["files"]
+
+  queryClient.setQueryData(
+    targetQuery,
+    (oldData: FilesResponse | undefined) => {
+      if (!oldData) return oldData
+      return {
+        ...oldData,
+        files: oldData.files.map((f) =>
+          f.resource_id === folderId
+            ? {
+                ...f,
+                indexingStatus: status,
+                kbResourceId:
+                  status === "not-indexed"
+                    ? undefined
+                    : kbResourceId || f.kbResourceId,
+                lastIndexedAt:
+                  status === "not-indexed"
+                    ? undefined
+                    : f.lastIndexedAt || new Date().toISOString(),
+              }
+            : f,
+        ),
+      }
+    },
+  )
 }

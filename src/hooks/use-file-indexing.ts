@@ -10,7 +10,12 @@ import {
 } from "@/lib/stack-ai-api"
 import type { FileItem, ActiveIndexing, FilesResponse } from "@/lib/types"
 import { useFileStatus } from "./use-file-status"
-import { getAllCachedDescendants } from "@/lib/utils"
+import {
+  getAllCachedDescendants,
+  getAllCachedItems,
+  folderHasIndexedChildren,
+  updateFolderStatus,
+} from "@/lib/utils"
 
 interface UseFileIndexingReturn {
   indexFiles: (selectedItems: FileItem[]) => void
@@ -81,6 +86,40 @@ export function useFileIndexing(): UseFileIndexingReturn {
     })
   }
 
+  // Check and update parent folder status after de-indexing
+  const checkAndUpdateParentFolderStatus = (file: FileItem) => {
+    if (!file.parentId) return
+
+    // Check if parent folder has any remaining indexed children
+    const hasIndexedChildren = folderHasIndexedChildren(
+      file.parentId,
+      queryClient,
+    )
+
+    if (!hasIndexedChildren) {
+      // Parent folder has no more indexed children, update it to "not-indexed"
+      updateFolderStatus(file.parentId, "not-indexed", queryClient)
+    }
+  }
+
+  // Restore parent folder status when re-indexing files
+  const restoreParentFolderStatus = (
+    file: FileItem,
+    knowledgeBaseId: string,
+  ) => {
+    if (!file.parentId) return
+
+    // If parent folder is "not-indexed", restore it to "indexed" since we're adding indexed content
+    const allItems = getAllCachedItems(queryClient)
+    const parentFolder = allItems.find(
+      (item: FileItem) => item.resource_id === file.parentId,
+    )
+
+    if (parentFolder && parentFolder.indexingStatus === "not-indexed") {
+      updateFolderStatus(file.parentId, "indexed", queryClient, knowledgeBaseId)
+    }
+  }
+
   // Index files mutation
   const indexMutation = useMutation({
     mutationFn: async (selectedItems: FileItem[]) => {
@@ -132,6 +171,11 @@ export function useFileIndexing(): UseFileIndexingReturn {
         kbResourceId: knowledgeBaseId,
       }))
 
+      // Restore parent folder status for individual files
+      selectedItems
+        .filter((item) => item.inode_type === "file")
+        .forEach((file) => restoreParentFolderStatus(file, knowledgeBaseId))
+
       // Start polling
       setActiveIndexing({
         knowledgeBaseId,
@@ -181,6 +225,9 @@ export function useFileIndexing(): UseFileIndexingReturn {
       return { file }
     },
     onSuccess: ({ file }) => {
+      // Check if parent folder should be updated to "not-indexed"
+      checkAndUpdateParentFolderStatus(file)
+
       toast.success(`Removed "${file.inode_path.path}" from knowledge base`)
     },
     onError: (error, file) => {
@@ -255,6 +302,9 @@ export function useFileIndexing(): UseFileIndexingReturn {
       return { indexedFiles: filtered }
     },
     onSuccess: ({ selectedItems }) => {
+      // Check parent folder status for each de-indexed file
+      selectedItems.forEach(checkAndUpdateParentFolderStatus)
+
       toast.success(
         `Removed ${selectedItems.length} file${selectedItems.length !== 1 ? "s" : ""} from knowledge base`,
       )

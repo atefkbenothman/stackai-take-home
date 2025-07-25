@@ -22,7 +22,7 @@ export function useFolderOperations(item: FileItem): UseFolderOperationsReturn {
   const queryClient = useQueryClient()
   const isFolder = item.inode_type === "directory"
   const autoSelectNewlyFetchedChildren = useSelectionStore(
-    (state) => state.autoSelectNewlyFetchedChildren
+    (state) => state.autoSelectNewlyFetchedChildren,
   )
 
   // Fetch folder data when expanded
@@ -65,7 +65,57 @@ export function useFolderOperations(item: FileItem): UseFolderOperationsReturn {
     if (folderData && isFolder) {
       autoSelectNewlyFetchedChildren(item.resource_id, queryClient)
     }
-  }, [folderData, isFolder, item.resource_id, autoSelectNewlyFetchedChildren, queryClient])
+  }, [
+    folderData,
+    isFolder,
+    item.resource_id,
+    autoSelectNewlyFetchedChildren,
+    queryClient,
+  ])
+
+  useEffect(() => {
+    if (folderData && isFolder && folderData.files) {
+      // Apply inheritance: if this folder has indexing status, apply it to children with no status
+      if (
+        item.indexingStatus &&
+        (item.indexingStatus === "indexed" ||
+          item.indexingStatus === "indexing" ||
+          item.indexingStatus === "pending")
+      ) {
+        const childrenNeedingStatus = folderData.files.filter(
+          (child) => !child.indexingStatus, // Only undefined/null status - respect explicit de-indexing
+        )
+
+        if (childrenNeedingStatus.length > 0) {
+          // Apply inherited status to children
+          childrenNeedingStatus.forEach((child) => {
+            const targetQuery = child.parentId
+              ? ["files", child.parentId]
+              : ["files"]
+            queryClient.setQueryData(
+              targetQuery,
+              (oldData: FilesResponse | undefined) => {
+                if (!oldData) return oldData
+                return {
+                  ...oldData,
+                  files: oldData.files.map((f) =>
+                    f.resource_id === child.resource_id
+                      ? {
+                          ...f,
+                          indexingStatus: item.indexingStatus,
+                          kbResourceId: item.kbResourceId,
+                          lastIndexedAt: new Date().toISOString(),
+                        }
+                      : f,
+                  ),
+                }
+              },
+            )
+          })
+        }
+      }
+    }
+  }, [folderData, isFolder, item, queryClient])
 
   return {
     isExpanded,

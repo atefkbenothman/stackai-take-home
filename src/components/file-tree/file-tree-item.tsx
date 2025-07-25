@@ -59,7 +59,7 @@ function FileTreeItemComponent({
   const toggleFolderSelectionRecursive = useSelectionStore(
     (state) => state.toggleFolderSelectionRecursive,
   )
-  
+
   const queryClient = useQueryClient()
 
   const {

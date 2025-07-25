@@ -18,62 +18,68 @@ export function useFileStatus(
   const queryClient = useQueryClient()
 
   // Recursive status update function
-  const updateFileAndDescendantsStatus = useCallback((
-    file: FileItem,
-    status: "indexed" | "error" | "indexing",
-    knowledgeBaseId: string
-  ) => {
-    // Update the file itself
-    const targetQuery = file.parentId ? ["files", file.parentId] : ["files"]
-    queryClient.setQueryData(
-      targetQuery,
-      (oldData: FilesResponse | undefined) => {
-        if (!oldData) return oldData
-        return {
-          ...oldData,
-          files: oldData.files.map((f) =>
-            f.resource_id === file.resource_id
-              ? {
-                  ...f,
-                  indexingStatus: status,
-                  kbResourceId: knowledgeBaseId,
-                  lastIndexedAt: new Date().toISOString(),
-                }
-              : f,
-          ),
-        }
-      },
-    )
+  const updateFileAndDescendantsStatus = useCallback(
+    (
+      file: FileItem,
+      status: "indexed" | "error" | "indexing",
+      knowledgeBaseId: string,
+    ) => {
+      // Update the file itself
+      const targetQuery = file.parentId ? ["files", file.parentId] : ["files"]
+      queryClient.setQueryData(
+        targetQuery,
+        (oldData: FilesResponse | undefined) => {
+          if (!oldData) return oldData
+          return {
+            ...oldData,
+            files: oldData.files.map((f) =>
+              f.resource_id === file.resource_id
+                ? {
+                    ...f,
+                    indexingStatus: status,
+                    kbResourceId: knowledgeBaseId,
+                    lastIndexedAt: new Date().toISOString(),
+                  }
+                : f,
+            ),
+          }
+        },
+      )
 
-    // If it's a folder, also update all its cached descendants
-    if (file.inode_type === "directory") {
-      const descendants = getAllCachedDescendants(file.resource_id, queryClient)
-      descendants.forEach((descendant) => {
-        const descendantQuery = descendant.parentId 
-          ? ["files", descendant.parentId] 
-          : ["files"]
-        queryClient.setQueryData(
-          descendantQuery,
-          (oldData: FilesResponse | undefined) => {
-            if (!oldData) return oldData
-            return {
-              ...oldData,
-              files: oldData.files.map((f) =>
-                f.resource_id === descendant.resource_id
-                  ? {
-                      ...f,
-                      indexingStatus: status,
-                      kbResourceId: knowledgeBaseId,
-                      lastIndexedAt: new Date().toISOString(),
-                    }
-                  : f,
-              ),
-            }
-          },
+      // If it's a folder, also update all its cached descendants
+      if (file.inode_type === "directory") {
+        const descendants = getAllCachedDescendants(
+          file.resource_id,
+          queryClient,
         )
-      })
-    }
-  }, [queryClient])
+        descendants.forEach((descendant) => {
+          const descendantQuery = descendant.parentId
+            ? ["files", descendant.parentId]
+            : ["files"]
+          queryClient.setQueryData(
+            descendantQuery,
+            (oldData: FilesResponse | undefined) => {
+              if (!oldData) return oldData
+              return {
+                ...oldData,
+                files: oldData.files.map((f) =>
+                  f.resource_id === descendant.resource_id
+                    ? {
+                        ...f,
+                        indexingStatus: status,
+                        kbResourceId: knowledgeBaseId,
+                        lastIndexedAt: new Date().toISOString(),
+                      }
+                    : f,
+                ),
+              }
+            },
+          )
+        })
+      }
+    },
+    [queryClient],
+  )
 
   const mapKBStatus = (status?: string): "indexed" | "error" | "indexing" => {
     return status === "indexed"
@@ -219,40 +225,31 @@ export function useFileStatus(
 
       // STEP 2: Handle selected folders - query their contents and create synthetic status
       for (const folder of selectedFolders) {
-        try {
-          const folderContents = await getKnowledgeBaseStatus(
-            knowledgeBaseId,
-            folder.inode_path.path,
-          )
+        const folderContents = await getKnowledgeBaseStatus(
+          knowledgeBaseId,
+          folder.inode_path.path,
+        )
 
-          // Update file tree cache for this folder
-          updateFolderCache(folder, folderContents.data, knowledgeBaseId)
+        // Update file tree cache for this folder
+        updateFolderCache(folder, folderContents.data, knowledgeBaseId)
 
-          // Aggregate folder status: if any file has error -> error, if all indexed -> indexed, else -> indexing
-          const files = folderContents.data.filter(
-            (f) => f.inode_type === "file",
-          )
-          const folderStatus =
-            files.length === 0
-              ? "indexed"
-              : files.some((f) => f.status === "error")
-                ? "error"
-                : files.every((f) => f.status === "indexed")
-                  ? "indexed"
-                  : "indexing"
+        // Aggregate folder status: if any file has error -> error, if all indexed -> indexed, else -> indexing
+        const files = folderContents.data.filter((f) => f.inode_type === "file")
+        const folderStatus =
+          files.length === 0
+            ? "indexed"
+            : files.some((f) => f.status === "error")
+              ? "error"
+              : files.every((f) => f.status === "indexed")
+                ? "indexed"
+                : "indexing"
 
-          allResults.push({
-            resource_id: folder.resource_id,
-            inode_type: "directory",
-            inode_path: folder.inode_path,
-            status: folderStatus,
-          })
-        } catch (error) {
-          console.warn(
-            `Failed to get folder contents for ${folder.inode_path.path}:`,
-            error,
-          )
-        }
+        allResults.push({
+          resource_id: folder.resource_id,
+          inode_type: "directory",
+          inode_path: folder.inode_path,
+          status: folderStatus,
+        })
       }
 
       // STEP 3: Filter to only the files we actually selected
@@ -282,10 +279,19 @@ export function useFileStatus(
         const status = mapKBStatus(kbResource.status)
 
         // Use recursive update function to update file and its descendants
-        updateFileAndDescendantsStatus(file, status, activeIndexing.knowledgeBaseId)
+        updateFileAndDescendantsStatus(
+          file,
+          status,
+          activeIndexing.knowledgeBaseId,
+        )
       }
     })
-  }, [activeIndexing, kbStatusData, queryClient, updateFileAndDescendantsStatus])
+  }, [
+    activeIndexing,
+    kbStatusData,
+    queryClient,
+    updateFileAndDescendantsStatus,
+  ])
 
   // Check if all files completed
   const { allFilesCompleted, allFilesSuccessful } = useMemo(() => {
