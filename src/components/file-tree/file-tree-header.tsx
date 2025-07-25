@@ -16,7 +16,7 @@ import {
 } from "@/components/ui/popover"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import type { SortOption } from "@/lib/utils"
+import type { SortOption } from "@/hooks/use-file-tree-data"
 
 interface SearchSectionProps {
   searchQuery: string

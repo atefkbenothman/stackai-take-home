@@ -1,7 +1,7 @@
 "use client"
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { toast } from "sonner"
 import {
   createKnowledgeBase,
@@ -9,7 +9,7 @@ import {
   triggerKnowledgeBaseSync,
   getKnowledgeBaseStatus,
   deleteFromKnowledgeBase,
-} from "@/lib/stack-ai-client"
+} from "@/lib/stack-ai-api"
 import type {
   FileItem,
   KBResource,
@@ -20,9 +20,11 @@ import type { QueryClient, Query } from "@tanstack/react-query"
 
 /**
  * Map KB resource status to our IndexingStatus
+ * For virtual directories (folders), undefined status means successfully indexed
  */
 function mapKBStatusToIndexingStatus(
   kbStatus?: string,
+  resourceId?: string,
 ): "pending" | "indexing" | "indexed" | "error" {
   switch (kbStatus) {
     case "pending":
@@ -31,9 +33,47 @@ function mapKBStatusToIndexingStatus(
       return "indexed"
     case "error":
       return "error"
+    case undefined:
+      // Virtual directories (STACK_VFS_VIRTUAL_DIRECTORY) don't have status fields
+      // If they appear in KB responses, they're successfully indexed as directory structure
+      if (resourceId === "STACK_VFS_VIRTUAL_DIRECTORY") {
+        return "indexed"
+      }
+      return "indexing" // Default for other cases
     default:
       return "indexing" // Default to indexing since we're polling an active KB
   }
+}
+
+/**
+ * Extract the parent folder path from a file's inode_path
+ * Examples:
+ * - "file.txt" → "/"
+ * - "papers/react_paper.pdf" → "/papers"
+ * - "classes/cs101/homework.pdf" → "/classes/cs101"
+ */
+function getParentFolderPath(inodePath: string): string {
+  const lastSlashIndex = inodePath.lastIndexOf("/")
+  if (lastSlashIndex === -1) {
+    return "/" // Root level file
+  }
+  const folderPath = inodePath.substring(0, lastSlashIndex)
+  return folderPath === "" ? "/" : `/${folderPath}`
+}
+
+/**
+ * Group files by their parent folder paths to minimize KB status API calls
+ */
+function groupFilesByFolder(files: FileItem[]): Map<string, FileItem[]> {
+  const folderMap = new Map<string, FileItem[]>()
+
+  files.forEach((file) => {
+    const folderPath = getParentFolderPath(file.inode_path.path)
+    const existing = folderMap.get(folderPath) || []
+    folderMap.set(folderPath, [...existing, file])
+  })
+
+  return folderMap
 }
 
 /**
@@ -75,7 +115,7 @@ function updateFileIndexingStatus(
     }
   })
 
-  // Update any folder-specific caches that might contain this file
+  // Update folder-specific caches that might contain this file
   const queryCache = queryClient.getQueryCache()
   queryCache.getAll().forEach((query: Query) => {
     if (query.queryKey[0] === "files" && query.queryKey[1]) {
@@ -116,9 +156,15 @@ interface UseFileIndexingReturn {
   indexFiles: (selectedItems: FileItem[]) => void
   deindexFile: (file: FileItem) => void
   batchDeindexFiles: (selectedItems: FileItem[]) => void
+  cancelIndexing: () => void
   isIndexing: boolean
   isPolling: boolean
   isActive: boolean
+  activeIndexing: {
+    knowledgeBaseId: string
+    selectedFiles: FileItem[]
+    startTime: number
+  } | null
 }
 
 async function indexFilesAPI(selectedItems: FileItem[]) {
@@ -176,7 +222,7 @@ async function batchDeindexFilesAPI(selectedItems: FileItem[]) {
     }),
   )
 
-  // Check for any failures
+  // Check for failures
   const failures = results.filter((result) => result.status === "rejected")
   if (failures.length > 0) {
     const firstError = (failures[0] as PromiseRejectedResult).reason
@@ -259,18 +305,63 @@ export function useFileIndexing(): UseFileIndexingReturn {
     },
   })
 
-  // Status polling query
+  // Status polling query - checks all folders containing indexed files
   const { data: kbStatusData, isLoading: isPollingQuery } = useQuery({
     queryKey: ["kb-status", activeIndexing?.knowledgeBaseId],
     queryFn: async () => {
       if (!activeIndexing?.knowledgeBaseId) return null
 
       try {
-        const result = await getKnowledgeBaseStatus(
-          activeIndexing.knowledgeBaseId,
-          "/",
-        )
-        return result
+        // Group files by their parent folder paths
+        const folderGroups = groupFilesByFolder(activeIndexing.selectedFiles)
+        const allResults: KBResource[] = []
+
+        // Group files by folder paths for efficient querying
+
+        // Also query root path to check for root-level folders
+        try {
+          const rootStatus = await getKnowledgeBaseStatus(
+            activeIndexing.knowledgeBaseId,
+            "/",
+          )
+          allResults.push(...rootStatus.data)
+        } catch (rootError) {
+          console.warn("Failed to query KB root path:", rootError)
+        }
+
+        // Query each folder's status separately
+        for (const [folderPath, filesInFolder] of folderGroups) {
+          try {
+            const folderStatus = await getKnowledgeBaseStatus(
+              activeIndexing.knowledgeBaseId,
+              folderPath,
+            )
+
+            allResults.push(...folderStatus.data)
+
+            // Also try querying each folder's direct path for additional resources
+            for (const file of filesInFolder) {
+              if (file.inode_type === "directory") {
+                const directPath = `/${file.inode_path.path}`
+                const directStatus = await getKnowledgeBaseStatus(
+                  activeIndexing.knowledgeBaseId,
+                  directPath,
+                )
+                allResults.push(...directStatus.data)
+              }
+            }
+          } catch (folderError) {
+            // Log folder-specific errors but continue with other folders
+            console.warn(
+              `Failed to get status for folder ${folderPath}:`,
+              folderError,
+            )
+          }
+        }
+
+        // Return all collected status results
+
+        return { data: allResults }
       } catch (err) {
         throw err
       }
@@ -287,6 +378,8 @@ export function useFileIndexing(): UseFileIndexingReturn {
       return
     }
 
+    // Process status updates for all selected files
+
     // Create a map of resource_id to status for quick lookup
     const statusMap = new Map<string, KBResource>()
     kbStatusData.data.forEach((kbResource: KBResource) => {
@@ -295,16 +388,34 @@ export function useFileIndexing(): UseFileIndexingReturn {
 
     // Update cache for each selected file based on KB status
     activeIndexing.selectedFiles.forEach((file) => {
-      const kbResource = statusMap.get(file.resource_id)
+      // First try exact resource ID match (works for files)
+      let kbResource = statusMap.get(file.resource_id)
 
-      if (kbResource?.status) {
-        const indexingStatus = mapKBStatusToIndexingStatus(kbResource.status)
+      // If no exact match and it's a directory, try path-based matching
+      // (Stack AI creates virtual directories with different resource IDs)
+      if (!kbResource && file.inode_type === "directory") {
+        const pathMatches = Array.from(statusMap.values()).filter(
+          (r) => r.inode_path.path === file.inode_path.path,
+        )
+        if (pathMatches.length > 0) {
+          kbResource = pathMatches[0] // Use the first path match
+        }
+      }
+
+      if (kbResource) {
+        const indexingStatus = mapKBStatusToIndexingStatus(
+          kbResource.status,
+          kbResource.resource_id,
+        )
+
+        // Always store the actual Knowledge Base UUID for de-indexing operations
+        // (The virtual directory ID is only used for status matching, not storage)
         updateFileIndexingStatus(
           queryClient,
           file.resource_id,
           indexingStatus,
           undefined,
-          activeIndexing.knowledgeBaseId,
+          activeIndexing.knowledgeBaseId, // Always use the real KB UUID
         )
       }
     })
@@ -315,11 +426,31 @@ export function useFileIndexing(): UseFileIndexingReturn {
     ? activeIndexing.selectedFiles.every((file) => {
         if (!kbStatusData?.data) return false
 
-        const kbResource = kbStatusData.data.find(
+        // First try exact resource ID match (works for files)
+        let kbResource = kbStatusData.data.find(
           (kb: KBResource) => kb.resource_id === file.resource_id,
         )
+
+        // If no exact match and it's a directory, try path-based matching
+        if (!kbResource && file.inode_type === "directory") {
+          kbResource = kbStatusData.data.find(
+            (kb: KBResource) => kb.inode_path.path === file.inode_path.path,
+          )
+        }
+
+        if (!kbResource) return false
+
+        // For virtual directories, undefined status means indexed
+        if (
+          file.inode_type === "directory" &&
+          kbResource.resource_id === "STACK_VFS_VIRTUAL_DIRECTORY"
+        ) {
+          return true // Virtual directories are considered completed when they appear
+        }
+
+        // For regular files, check explicit status
         const isCompleted =
-          kbResource?.status === "indexed" || kbResource?.status === "error"
+          kbResource.status === "indexed" || kbResource.status === "error"
 
         return isCompleted
       })
@@ -458,12 +589,37 @@ export function useFileIndexing(): UseFileIndexingReturn {
   const isPolling = isPollingQuery && !!activeIndexing
   const isActive = isIndexing || isPolling
 
+  // Cancel function to stop monitoring and reset state
+  const cancelIndexing = useCallback(() => {
+    if (activeIndexing) {
+      // Rollback optimistic updates - reset files to previous states
+      activeIndexing.selectedFiles.forEach((file) => {
+        updateFileIndexingStatus(
+          queryClient,
+          file.resource_id,
+          "not-indexed", // Reset to not-indexed since we can't know actual state
+          undefined,
+          undefined, // Clear KB ID
+        )
+      })
+
+      // Reset the active indexing state (this stops polling)
+      setActiveIndexing(null)
+
+      toast.info(
+        "Stopped monitoring indexing. Operations may continue in background.",
+      )
+    }
+  }, [activeIndexing, queryClient])
+
   return {
     indexFiles: mutation.mutate,
     deindexFile: deindexMutation.mutate,
     batchDeindexFiles: batchDeindexMutation.mutate,
+    cancelIndexing,
     isIndexing,
     isPolling,
     isActive,
+    activeIndexing, // Expose for cancel button visibility
   }
 }

@@ -14,12 +14,12 @@ import { StatusBadge } from "@/components/file-tree/file-tree-status-badge"
 import { useFolderOperations } from "@/hooks/use-folder-operations"
 import { useSelectionStore } from "@/stores/selection-store"
 import type { FileItem } from "@/lib/types"
+import { formatDate } from "@/lib/utils"
 import {
-  formatDate,
   sortFiles,
   filterByExtension,
   type SortOption,
-} from "@/lib/utils"
+} from "@/hooks/use-file-tree-data"
 
 interface FileTreeItemProps {
   item: FileItem
@@ -36,12 +36,11 @@ function FileTreeItemComponent({
 }: FileTreeItemProps) {
   const isFolder = item.inode_type === "directory"
 
-  // Use manual subscription for THIS item only
   const [isSelected, setIsSelected] = useState(() =>
     useSelectionStore.getState().selectedItems.has(item.resource_id),
   )
 
-  // Subscribe only to changes that affect THIS specific item
+  // Subscribe only to changes that affect this specific item
   useEffect(() => {
     const unsubscribe = useSelectionStore.subscribe((state, prevState) => {
       const wasSelected = prevState.selectedItems.has(item.resource_id)
@@ -55,7 +54,6 @@ function FileTreeItemComponent({
     return unsubscribe
   }, [item.resource_id])
 
-  // Get actions from store (these are stable)
   const toggleSelection = useSelectionStore((state) => state.toggleSelection)
   const toggleFolderSelection = useSelectionStore(
     (state) => state.toggleFolderSelection,
@@ -171,11 +169,9 @@ function FileTreeItemComponent({
         </div>
 
         {/* Indexing status indicator */}
-        {item.indexingStatus && (
-          <div className="ml-2 flex items-center">
-            <StatusBadge status={item.indexingStatus} />
-          </div>
-        )}
+        <div className="ml-2 flex items-center">
+          <StatusBadge status={item.indexingStatus || "not-indexed"} />
+        </div>
 
         {/* Last modified date */}
         {item.modified_at && (

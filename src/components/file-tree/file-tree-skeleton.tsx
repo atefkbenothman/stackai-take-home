@@ -24,7 +24,7 @@ export function FileTreeSkeleton() {
           </div>
         ))}
       </div>
-      <FileTreeFooter allFiles={[]} />
+      <FileTreeFooter />
     </div>
   )
 }

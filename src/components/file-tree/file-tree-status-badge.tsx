@@ -1,6 +1,6 @@
 "use client"
 
-import { Clock, Loader2, CheckCircle, XCircle, Circle, X } from "lucide-react"
+import { Clock, Loader2, CheckCircle, XCircle, X } from "lucide-react"
 import type { FileItem } from "@/lib/types"
 
 const STATUS_CONFIG = {
@@ -26,7 +26,7 @@ const STATUS_CONFIG = {
     className: "bg-red-100 text-red-800",
   },
   "not-indexed": {
-    icon: Circle,
+    icon: null,
     text: "Not Indexed",
     className: "bg-gray-100 text-gray-800",
   },
@@ -49,19 +49,24 @@ export function StatusBadge({ status, file, onDeindex }: StatusBadgeProps) {
   if (canDeindex) {
     return (
       <span
-        className={`group inline-flex items-center gap-1 rounded-xs px-2 py-1 text-xs font-medium cursor-pointer hover:bg-red-100 hover:text-red-800 transition-colors ${config.className}`}
+        className={`group inline-flex cursor-pointer items-center gap-1 rounded-xs px-2 py-1 text-xs font-medium transition-colors hover:bg-red-100 hover:text-red-800 ${config.className}`}
         onClick={(e) => {
           e.stopPropagation()
           onDeindex(file)
         }}
         title="Click to remove from index"
       >
-        <Icon
-          size={12}
-          className={"iconClassName" in config ? config.iconClassName : ""}
-        />
+        {Icon && (
+          <Icon
+            size={12}
+            className={"iconClassName" in config ? config.iconClassName : ""}
+          />
+        )}
         {config.text}
-        <X size={10} className="opacity-0 group-hover:opacity-100 transition-opacity" />
+        <X
+          size={10}
+          className="opacity-0 transition-opacity group-hover:opacity-100"
+        />
       </span>
     )
   }
@@ -70,10 +75,12 @@ export function StatusBadge({ status, file, onDeindex }: StatusBadgeProps) {
     <span
       className={`inline-flex items-center gap-1 rounded-xs px-2 py-1 text-xs font-medium ${config.className}`}
     >
-      <Icon
-        size={12}
-        className={"iconClassName" in config ? config.iconClassName : ""}
-      />
+      {Icon && (
+        <Icon
+          size={12}
+          className={"iconClassName" in config ? config.iconClassName : ""}
+        />
+      )}
       {config.text}
     </span>
   )

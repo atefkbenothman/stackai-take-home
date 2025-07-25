@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server"
-import { getAuthToken } from "@/lib/auth"
-import { getOrgInfo, getGoogleDriveConnection } from "@/lib/stack-ai"
+import { getAuthToken } from "@/lib/stack-ai-auth"
+import { getOrgInfo, getGoogleDriveConnection } from "@/lib/stack-ai-api"
 
 /**
- * GET /api/auth/token - Get authentication token and connection info for client-side Stack AI calls
+ * Get authentication token and connection info for client-side Stack AI calls
  */
 export async function GET(): Promise<NextResponse> {
   try {

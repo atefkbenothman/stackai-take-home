@@ -1,12 +1,5 @@
 import { cookies } from "next/headers"
 
-/**
- * Server-side authentication utilities for Stack AI
- */
-
-/**
- * Authentication result containing token and expiration info
- */
 export interface AuthResult {
   token: string
   expires_in: number

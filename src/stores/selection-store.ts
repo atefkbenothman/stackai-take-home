@@ -6,7 +6,6 @@ interface SelectionStore {
 
   toggleSelection: (item: FileItem) => void
   toggleFolderSelection: (folder: FileItem, children?: FileItem[]) => void
-  selectAll: (items: FileItem[]) => void
   clearSelection: () => void
 
   isSelected: (itemId: string) => boolean
@@ -54,18 +53,6 @@ export const useSelectionStore = create<SelectionStore>((set, get) => ({
           newSelectedItems.set(child.resource_id, child)
         })
       }
-
-      return { selectedItems: newSelectedItems }
-    })
-  },
-
-  selectAll: (items: FileItem[]) => {
-    set((state) => {
-      const newSelectedItems = new Map(state.selectedItems)
-
-      items.forEach((item) => {
-        newSelectedItems.set(item.resource_id, item)
-      })
 
       return { selectedItems: newSelectedItems }
     })
