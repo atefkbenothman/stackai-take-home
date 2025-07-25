@@ -2,6 +2,10 @@
 
 [**View Live Demo**](https://stackai-take-home-kai.vercel.app)
 
+## 📹 Demo Video
+
+[Screen recording]
+
 ## ️Local Development Setup
 
 ### Installation
@@ -32,6 +36,7 @@
    STACK_AI_API_URL="stack_ai_api_url"
    STACK_AI_AUTH_URL="stack_ai_auth_url"
    SUPABASE_ANON_KEY="stack_ai_supabase_anon_key"
+
    NEXT_PUBLIC_STACK_AI_API_URL="stack_ai_api_url"
    ```
 
@@ -52,30 +57,22 @@ npm run dev
 - **Styling**: Tailwind CSS + shadcn/ui components
 - **Data Fetching / Caching**: TanStack Query
 - **Icons**: Lucide React
-- **State Management**: React state + Zustand (selection only)
-
-## Features
-
-• **Google Drive-style File Picker** – browse folders, view files, and navigate just like Finder.
-• **Search, Sort & Filter** – instant search by name, sort by name/date, and filter by file extension.
-• **Optimistic Indexing Workflow** – select files/folders and trigger indexing into Stack AI Knowledge Bases with immediate UI feedback.
-• **Real-time Status Badges** – clear “Indexed / Pending / Error / Not Indexed” labels for every file.
-• **Skeleton Loading** – smooth, spinner-free loading states for a snappy UX.
-• **Secure Token Management** – server-side HTTP-only cookies keep the Stack AI token off the client; a lightweight API route exposes a short-lived token to the browser on demand.
+- **State Management**: Zustand
 
 ## Technical Choices
 
 ### API Architecture
 
-- **Security**: Long-lived credentials (email, password, Supabase anon key) stay server-side; the client only ever sees a **short-lived, Stack AI-scoped JWT**.
-- **Scoped Token Exposure**: `/api/auth/token` hands the browser just the JWT plus `org_id` / `connection_id`
-- **Simplicity & Performance**: After that single proxy call, the browser talks directly to Stack AI, avoiding extra network hops while still keeping secrets safe.
+- **Security**: Credentials stay server-side, client receives JWT tokens
+- **Direct API calls**: Client calls Stack AI directly after initial auth
 
-### Data Fetching & Prefetching Strategy
+### Data Fetching & Performance
 
-- **TanStack Query** handles caching, loading states, and background refetching.
-- **Lazy Loading of Folders**: child folders aren’t queried until the user expands them, so we never fetch the entire Google-Drive tree up-front.
-- **Hover Prefetch**: when you hover a closed folder, we call `queryClient.prefetchQuery` (see `useFolderOperations`) so the data is already in cache by the time you click—no visible spinner.
-- **Cache Re-use**: each folder is cached under `['files', folderId]`; navigating back to a folder re-uses that cached response instantly.
-- **StaleTime = 5 min** strikes a balance between responsiveness and freshness, reducing network chatter during a session.
-- **Optimistic UI updates** provide instant feedback with error rollback for better UX.
+- **Lazy loading**: Load folder contents only when user opens them
+- **Hover prefetch**: Prefetch folder contents on mouse hover
+- **Cross-cache search**: Search across all cached folder data, not just current folder
+- **Parent/child deduplication**: Only indexes parent folders when both folder and child files are selected
+- **3-second polling**: Poll indexing status every 3 seconds, timeout after 5 minutes
+- **Zustand selection state**: Minimizes re-renders with selective subscriptions per component
+- **Optimistic UI**: Show immediate updates, rollback on errors
+- **Skeleton loading**: Show content placeholders instead of spinners
