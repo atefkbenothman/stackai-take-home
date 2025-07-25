@@ -1,6 +1,6 @@
 "use client"
 
-import { memo, useCallback, useMemo, useState, useEffect } from "react"
+import { memo, useCallback, useState, useEffect } from "react"
 import {
   ChevronRight,
   ChevronDown,
@@ -68,46 +68,6 @@ function FileTreeItemComponent({
     prefetch,
   } = useFolderOperations(item)
 
-  const itemIsIndeterminate = useMemo(() => {
-    if (!isFolder || isSelected) return false
-
-    const children = folderData?.files || []
-    const validChildren = children.filter(
-      (child) => child.parentId === item.resource_id,
-    )
-
-    const selectedItems = useSelectionStore.getState().selectedItems
-
-    const hasSelectedDescendants = Array.from(selectedItems.values()).some(
-      (selectedItem) => {
-        if (selectedItem.resource_id === item.resource_id) return false
-        if (selectedItem.parentId === item.resource_id) return true
-
-        let currentItem = selectedItem
-        while (currentItem.parentId) {
-          const parent = Array.from(selectedItems.values()).find(
-            (p) => p.resource_id === currentItem.parentId,
-          )
-          if (!parent) break
-          if (parent.resource_id === item.resource_id) return true
-          currentItem = parent
-        }
-        return false
-      },
-    )
-
-    if (!hasSelectedDescendants) return false
-
-    if (validChildren.length > 0) {
-      const allDirectChildrenSelected = validChildren.every((child) =>
-        selectedItems.has(child.resource_id),
-      )
-      return !allDirectChildrenSelected
-    }
-
-    return true
-  }, [isFolder, isSelected, item.resource_id, folderData?.files])
-
   const handleCheckboxChange = useCallback(() => {
     if (isFolder && folderData?.files) {
       const validChildren = folderData.files.filter(
@@ -136,7 +96,7 @@ function FileTreeItemComponent({
         onMouseEnter={prefetch}
       >
         <Checkbox
-          checked={itemIsIndeterminate ? "indeterminate" : isSelected}
+          checked={isSelected}
           onCheckedChange={handleCheckboxChange}
           onClick={(e) => e.stopPropagation()}
           className="mr-2 hover:cursor-pointer"

@@ -9,7 +9,6 @@ interface SelectionStore {
   clearSelection: () => void
 
   isSelected: (itemId: string) => boolean
-  isIndeterminate: (folder: FileItem, children?: FileItem[]) => boolean
   getMinimalSelectedItems: () => FileItem[]
   getSelectionSummary: () => { count: number; totalSize: number }
 }
@@ -67,61 +66,13 @@ export const useSelectionStore = create<SelectionStore>((set, get) => ({
     return state.selectedItems.has(itemId)
   },
 
-  isIndeterminate: (folder: FileItem, children: FileItem[] = []) => {
-    const state = get()
-
-    if (folder.inode_type !== "directory") {
-      return false
-    }
-
-    if (state.selectedItems.has(folder.resource_id)) {
-      return false
-    }
-
-    const validChildren = children.filter(
-      (child) => child.parentId === folder.resource_id,
-    )
-
-    const hasSelectedDescendants = Array.from(
-      state.selectedItems.values(),
-    ).some((item) => {
-      if (item.resource_id === folder.resource_id) return false
-
-      if (item.parentId === folder.resource_id) return true
-
-      let currentItem = item
-      while (currentItem.parentId) {
-        const parent = Array.from(state.selectedItems.values()).find(
-          (p) => p.resource_id === currentItem.parentId,
-        )
-        if (!parent) break
-
-        if (parent.resource_id === folder.resource_id) return true
-        currentItem = parent
-      }
-      return false
-    })
-
-    if (!hasSelectedDescendants) {
-      return false
-    }
-
-    if (validChildren.length > 0) {
-      const allDirectChildrenSelected = validChildren.every((child) =>
-        state.selectedItems.has(child.resource_id),
-      )
-      return !allDirectChildrenSelected
-    }
-
-    return true
-  },
-
   getMinimalSelectedItems: () => {
     const state = get()
-    const allSelected = Array.from(state.selectedItems.values())
+    // Cache both array conversion and Set creation once per method call
+    const selectedItemsArray = Array.from(state.selectedItems.values())
     const selectedIds = new Set(state.selectedItems.keys())
 
-    return allSelected.filter((item) => {
+    return selectedItemsArray.filter((item) => {
       const hasSelectedAncestor = (currentItem: FileItem): boolean => {
         if (!currentItem.parentId) return false
 
@@ -129,7 +80,7 @@ export const useSelectionStore = create<SelectionStore>((set, get) => ({
           return true
         }
 
-        const parentItem = allSelected.find(
+        const parentItem = selectedItemsArray.find(
           (p) => p.resource_id === currentItem.parentId,
         )
         if (parentItem) {
@@ -145,9 +96,10 @@ export const useSelectionStore = create<SelectionStore>((set, get) => ({
 
   getSelectionSummary: () => {
     const state = get()
-    const items = Array.from(state.selectedItems.values())
-    const count = items.length
-    const totalSize = items.reduce((sum, item) => {
+    // Cache the array conversion once per method call
+    const selectedItemsArray = Array.from(state.selectedItems.values())
+    const count = selectedItemsArray.length
+    const totalSize = selectedItemsArray.reduce((sum, item) => {
       return sum + (item.dataloader_metadata?.size || 0)
     }, 0)
 

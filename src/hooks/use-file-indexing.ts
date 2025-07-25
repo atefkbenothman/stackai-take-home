@@ -260,7 +260,7 @@ export function useFileIndexing(): UseFileIndexingReturn {
         updateFileIndexingStatus(queryClient, item.resource_id, "pending")
       })
 
-      toast.info("Creating Knowledge Base and indexing files...")
+      toast.info("Indexing files...")
       return { selectedItems }
     },
     onSuccess: (data) => {
@@ -285,7 +285,7 @@ export function useFileIndexing(): UseFileIndexingReturn {
       })
 
       toast.success(
-        `Successfully created Knowledge Base and started indexing ${selectedItems.length} file${selectedItems.length !== 1 ? "s" : ""}`,
+        `Indexing ${selectedItems.length} file${selectedItems.length !== 1 ? "s" : ""}`,
       )
     },
     onError: (error, selectedItems) => {
@@ -504,12 +504,12 @@ export function useFileIndexing(): UseFileIndexingReturn {
         undefined, // Clear the KB ID
       )
 
-      toast.info(`Removing "${file.inode_path.path}" from index...`)
+      toast.info(`Removing "${file.inode_path.path}" from knowledge base...`)
       return { file }
     },
     onSuccess: (data) => {
       const { file } = data
-      toast.success(`Successfully removed "${file.inode_path.path}" from index`)
+      toast.success(`Removed "${file.inode_path.path}" from knowledge base`)
 
       // File status should already be "not-indexed" from optimistic update
       // No need to update again
@@ -525,7 +525,7 @@ export function useFileIndexing(): UseFileIndexingReturn {
       )
 
       toast.error(
-        `Failed to remove "${file.inode_path.path}" from index: ${error instanceof Error ? error.message : "Unknown error"}`,
+        `Failed to remove "${file.inode_path.path}" from knowledge base: ${error instanceof Error ? error.message : "Unknown error"}`,
       )
     },
   })
@@ -555,14 +555,14 @@ export function useFileIndexing(): UseFileIndexingReturn {
       })
 
       toast.info(
-        `Removing ${indexedFiles.length} file${indexedFiles.length !== 1 ? "s" : ""} from index...`,
+        `Removing ${indexedFiles.length} file${indexedFiles.length !== 1 ? "s" : ""} from knowledge base...`,
       )
       return { indexedFiles }
     },
     onSuccess: (data) => {
       const { selectedItems } = data
       toast.success(
-        `Successfully removed ${selectedItems.length} file${selectedItems.length !== 1 ? "s" : ""} from index`,
+        `Removed ${selectedItems.length} file${selectedItems.length !== 1 ? "s" : ""} from knowledge base`,
       )
     },
     onError: (error, _, context) => {
@@ -580,7 +580,7 @@ export function useFileIndexing(): UseFileIndexingReturn {
       }
 
       toast.error(
-        `Failed to remove files from index: ${error instanceof Error ? error.message : "Unknown error"}`,
+        `Failed to remove files from knowledge base: ${error instanceof Error ? error.message : "Unknown error"}`,
       )
     },
   })
